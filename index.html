@@ -1,0 +1,1927 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<title>Rebalanceador de Carteira</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* DM Sans é a aproximação pública mais próxima da NuSans (fonte proprietária da Nubank,
+       não distribuída fora do app); cai pro stack do sistema se estiver offline */
+    --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, Monaco, "Cascadia Code", monospace;
+
+    /* valores padrão — sobrescritos em runtime pelo motor de temas (ver <script>) */
+    --bg:#000000;
+    --surface:#161616;
+    --surface-2:#212121;
+    --line:#333333;
+    --ink:#f5f5f5;
+    --muted:#9a9a9a;
+    --accent:#5B3593;
+    --accent-dim:#3A2261;
+    --green:#5a9c7a;
+    --green-dim:#2c4237;
+    --rust:#c1684a;
+    --rust-dim:#4a2c22;
+    --neutral:#8e9bc4;
+    --neutral-dim:#2a2f45;
+    --under:#4FB8AE;
+    --under-dim:#1c3d3a;
+    --on-accent:#F5F0FA;
+    --accent-glow:rgba(91,53,147,0.14);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  html{transition:background .25s ease;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 20% -10%, var(--accent-glow), transparent),
+      var(--bg);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    min-height:100vh;
+    padding:40px 20px 80px;
+    transition:background .25s ease, color .25s ease;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+
+  /* theme switcher */
+  .theme-bar{
+    display:flex;justify-content:flex-end;align-items:center;gap:14px;
+    margin-bottom:18px;flex-wrap:wrap;
+  }
+  .mode-toggle{
+    display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;
+  }
+  .mode-toggle button{
+    background:var(--surface);border:none;color:var(--muted);
+    font-family:var(--font-sans);font-size:12px;font-weight:500;padding:8px 14px;
+    cursor:pointer;display:flex;align-items:center;gap:5px;
+  }
+  .mode-toggle button.active{background:var(--accent);color:var(--on-accent);font-weight:600;}
+  .theme-swatch{
+    width:26px;height:26px;border-radius:50%;cursor:pointer;
+    border:2px solid var(--line);padding:0;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .theme-swatch:hover{transform:scale(1.1);box-shadow:0 0 0 3px var(--surface-2);}
+
+
+  /* header */
+  .masthead{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:none;
+    padding-bottom:8px;margin-bottom:28px;
+    flex-wrap:wrap;gap:12px;
+  }
+  h1{
+    font-family:var(--font-sans);font-weight:700;
+    font-size:32px;margin:0;letter-spacing:-.01em;
+  }
+  .date-block{text-align:right;}
+  .date-label{
+    font-family:var(--font-sans);font-size:11px;
+    color:var(--muted);opacity:.8;margin-bottom:3px;
+  }
+  .masthead .date{
+    font-family:var(--font-sans);font-size:13px;color:var(--muted);
+    text-align:right;
+  }
+
+  /* summary strip */
+  .summary{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+    background:var(--line);border:none;
+    margin-bottom:28px;border-radius:20px;overflow:hidden;
+  }
+  .summary .cell{background:var(--surface);padding:18px 20px;}
+  .summary .cell .label{
+    font-size:12px;color:var(--muted);margin-bottom:8px;
+  }
+  .summary .cell .value{
+    font-family:var(--font-sans);font-size:22px;font-weight:600;color:var(--ink);
+  }
+  .summary .cell.accent .value{color:var(--accent);}
+  .summary .cell input{
+    width:100%;background:transparent;border:none;outline:none;
+    font-family:var(--font-sans);font-size:22px;font-weight:600;color:var(--accent);
+    padding:0;
+  }
+  .summary .cell input::placeholder{color:var(--accent-dim);}
+
+  /* ledger tape - stacked bar */
+  .tape{
+    margin-bottom:32px;
+  }
+  .tape .tape-label{font-size:12px;color:var(--muted);margin-bottom:10px;}
+  .tape-bar{
+    display:flex;height:34px;border-radius:6px;overflow:hidden;border:1px solid var(--line);
+  }
+  .tape-bar .seg{height:100%;transition:width .3s ease, filter .12s ease;cursor:default;}
+  .tape-bar .seg:hover{filter:brightness(1.2);}
+
+  .tape-tooltip{
+    position:fixed;z-index:1600;pointer-events:none;
+    background:var(--ink);color:var(--bg);
+    font-family:var(--font-sans);font-size:12px;font-weight:600;
+    padding:6px 11px;border-radius:8px;white-space:nowrap;
+    opacity:0;transform:translate(-50%,-4px);transition:opacity .1s ease, transform .1s ease;
+    box-shadow:0 8px 20px rgba(0,0,0,0.25);
+  }
+  .tape-tooltip.show{opacity:1;transform:translate(-50%,-8px);}
+  .tape-tooltip::after{
+    content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+    border:5px solid transparent;border-top-color:var(--ink);
+  }
+  .tape-legend{
+    display:flex;flex-wrap:wrap;gap:14px;margin-top:10px;
+  }
+  .tape-legend .item{
+    display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);
+    font-family:var(--font-sans);
+  }
+  .tape-legend .dot{width:8px;height:8px;border-radius:2px;flex:none;}
+
+  /* percent total indicator */
+  .pct-total{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;border-radius:8px;margin-bottom:16px;
+    font-family:var(--font-sans);font-size:13px;
+    border:1px solid var(--line);
+  }
+  .pct-total.ok{border-color:var(--green-dim);background:rgba(76,140,107,0.08);color:var(--green);}
+  .pct-total.bad{border-color:var(--rust-dim);background:rgba(181,86,58,0.08);color:var(--rust);}
+
+  /* asset rows */
+  .assets{border:none;border-radius:20px;overflow:hidden;margin-bottom:24px;}
+  .asset-row{
+    background:var(--surface);
+    border-bottom:1px solid var(--line);
+    padding:16px 20px;
+    display:grid;
+    grid-template-columns:20px 34px 1fr 90px 22px;
+    grid-template-rows:auto auto auto auto;
+    gap:14px 16px;
+    align-items:center;
+    position:relative;
+  }
+  .asset-row:last-child{border-bottom:none;}
+  .asset-row.disabled{opacity:.42;}
+  .asset-row.dragging{opacity:.35;}
+  .asset-row.drag-over-top::before{
+    content:"";position:absolute;top:-1px;left:20px;right:20px;height:2px;background:var(--accent);
+  }
+  .asset-row.drag-over-bottom::after{
+    content:"";position:absolute;bottom:-1px;left:20px;right:20px;height:2px;background:var(--accent);
+  }
+
+  .drag-handle{
+    grid-column:1/2;grid-row:1;
+    cursor:grab;color:var(--muted);font-size:13px;letter-spacing:-1px;
+    display:flex;align-items:center;justify-content:center;user-select:none;
+  }
+  .drag-handle:hover{color:var(--accent);}
+  .drag-handle:active{cursor:grabbing;}
+
+  .delete-btn{
+    grid-column:5/6;grid-row:1;
+    width:22px;height:22px;border-radius:5px;border:1px solid var(--line);
+    background:var(--surface-2);cursor:pointer;color:var(--muted);
+    font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;
+    transition:background .15s ease, border-color .15s ease, color .15s ease;
+  }
+  .delete-btn:hover{border-color:var(--rust);color:var(--rust);}
+  .delete-btn.armed{
+    background:var(--rust);border-color:var(--rust);color:#fff;
+    animation:armPulse 1s ease-in-out infinite;
+  }
+  @keyframes armPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.12);}}
+
+  .toggle{
+    grid-column:2/3;grid-row:1;
+    width:34px;height:20px;border-radius:999px;border:1px solid var(--line);
+    background:var(--surface-2);cursor:pointer;position:relative;flex:none;
+    transition:background .18s ease, border-color .18s ease;
+  }
+  .toggle::after{
+    content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:var(--muted);transition:left .18s ease, background .18s ease;
+  }
+  .toggle.on{background:var(--accent);border-color:var(--accent);}
+  .toggle.on::after{left:16px;background:var(--on-accent);}
+
+  .asset-name-row{
+    grid-column:3/4;grid-row:1;display:flex;align-items:center;gap:8px;font-family:var(--font-sans);font-size:17px;
+    min-width:0;
+  }
+  .asset-name-row .swatch{
+    width:10px;height:10px;border-radius:2px;flex:none;
+    border:none;padding:0;cursor:pointer;box-shadow:0 0 0 0 transparent;
+    transition:box-shadow .15s ease, transform .15s ease;
+  }
+  .asset-name-row .swatch:hover{box-shadow:0 0 0 3px var(--surface-2), 0 0 0 4px var(--line);transform:scale(1.15);}
+  .asset-name-row input.rename{
+    background:transparent;border:none;outline:none;color:var(--ink);
+    font-family:var(--font-sans);font-size:17px;width:100%;min-width:0;border-bottom:1px dashed transparent;
+    overflow:hidden;text-overflow:ellipsis;
+  }
+  .asset-name-row input.rename:focus{border-bottom-color:var(--accent-dim);}
+
+  .pct-display{
+    grid-column:4/5;grid-row:1;text-align:right;font-family:var(--font-sans);
+    font-size:16px;font-weight:600;color:var(--accent);
+    display:flex;align-items:center;justify-content:flex-end;gap:2px;
+  }
+  .pct-display input.pct-num{
+    width:52px;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;
+    color:var(--accent);font-family:var(--font-sans);font-size:15px;font-weight:600;
+    text-align:right;padding:3px 4px;outline:none;
+    -moz-appearance:textfield;
+  }
+  .pct-display input.pct-num::-webkit-outer-spin-button,
+  .pct-display input.pct-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  .pct-display input.pct-num:focus{border-color:var(--accent-dim);}
+  .pct-display input.pct-num:disabled{opacity:.5;}
+
+  .slider-row{grid-column:1/6;grid-row:2;display:flex;flex-direction:column;gap:5px;}
+  .slider-row input[type=range]{
+    width:100%;-webkit-appearance:none;appearance:none;height:4px;
+    border-radius:2px;outline:none;
+    background:var(--line);
+    transition:box-shadow .15s ease;
+  }
+  .scale-labels{
+    display:flex;justify-content:space-between;padding:0 1px;
+    font-size:10px;color:var(--muted);opacity:.65;
+  }
+  .slider-row input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+    background:var(--accent);cursor:pointer;border:2px solid var(--bg);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .slider-row input[type=range]::-moz-range-thumb{
+    width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--bg);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .slider-track-wrap.snapped input[type=range]::-webkit-slider-thumb{
+    transform:scale(1.45);
+    box-shadow:0 0 0 6px var(--accent-glow);
+  }
+  .slider-track-wrap.snapped input[type=range]::-moz-range-thumb{
+    transform:scale(1.45);
+    box-shadow:0 0 0 6px var(--accent-glow);
+  }
+
+  .value-row{
+    grid-column:1/6;grid-row:3;
+    display:flex;flex-direction:column;gap:8px;
+    font-family:var(--font-sans);font-size:12.5px;color:var(--muted);
+    padding-top:2px;
+  }
+  .value-row-main{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .value-row-main label{display:flex;align-items:center;gap:6px;}
+  .value-row .curr-input{
+    background:var(--surface-2);border:1px solid var(--line);border-radius:5px;
+    color:var(--ink);font-family:var(--font-sans);font-size:12.5px;
+    padding:4px 7px;width:120px;outline:none;
+  }
+  .value-row .curr-input:focus{border-color:var(--accent-dim);}
+  .value-row .curr-input:disabled{opacity:.55;cursor:not-allowed;}
+  .locked-note{font-size:10.5px;color:var(--muted);opacity:.75;font-style:italic;}
+  .value-row-stats{display:flex;align-items:center;gap:14px;flex-wrap:wrap;row-gap:6px;}
+  .value-row-stats .stat{color:var(--muted);white-space:nowrap;}
+  .value-row-stats .stat b{color:var(--ink);font-weight:600;}
+  .status-chip{
+    font-size:10.5px;font-weight:600;padding:4px 10px;border-radius:999px;
+    border:none;white-space:nowrap;
+  }
+  .status-chip.zero{color:var(--green);background:var(--green-dim);}
+  .status-chip.ok{color:var(--neutral);background:var(--neutral-dim);}
+  .status-chip.under{color:var(--under);background:var(--under-dim);}
+  .status-chip.over{color:var(--rust);background:var(--rust-dim);}
+
+  .sub-area{grid-column:1/6;grid-row:4;}
+  .add-sub-btn{
+    background:transparent;border:1px dashed var(--line);color:var(--muted);
+    font-family:var(--font-sans);font-size:11.5px;font-weight:500;padding:6px 14px;
+    border-radius:999px;cursor:pointer;margin-top:6px;
+  }
+  .add-sub-btn:hover{border-color:var(--accent-dim);color:var(--accent);}
+
+  .subgroups-block{
+    margin-top:10px;padding:12px 14px 6px;background:var(--surface-2);
+    border-left:2px solid var(--line);border-radius:0 14px 14px 0;
+  }
+  .sub-sum{
+    display:flex;justify-content:space-between;font-family:var(--font-sans);font-size:10.5px;
+    padding-bottom:8px;margin-bottom:8px;border-bottom:1px solid var(--line);
+  }
+  .sub-sum.ok{color:var(--green);}
+  .sub-sum.bad{color:var(--rust);}
+
+  .sub-row{
+    display:grid;grid-template-columns:26px 1fr 92px 18px;gap:10px;align-items:center;
+    padding:9px 0;border-bottom:1px dashed var(--line);
+  }
+  .sub-row:last-of-type{border-bottom:none;}
+  .toggle-sm{grid-column:1/2;grid-row:1;width:26px;height:16px;}
+  .toggle-sm::after{width:11px;height:11px;}
+  .toggle-sm.on::after{left:11px;}
+  .sub-rename{
+    grid-column:2/3;grid-row:1;background:transparent;border:none;outline:none;color:var(--ink);
+    font-family:var(--font-sans);font-size:14px;border-bottom:1px dashed transparent;
+    width:100%;min-width:0;padding:2px 0;overflow:hidden;text-overflow:ellipsis;
+  }
+  .sub-rename:focus{border-bottom-color:var(--accent-dim);}
+  .sub-rename:disabled{opacity:.5;}
+  .sub-pct-display{grid-column:3/4;grid-row:1;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:2px;}
+  .sub-pct-num{
+    width:64px;background:var(--surface);border:1px solid var(--line);border-radius:5px;
+    color:var(--accent);font-family:var(--font-sans);font-size:13px;font-weight:600;
+    text-align:right;padding:4px 6px;outline:none;-moz-appearance:textfield;
+  }
+  .sub-pct-num::-webkit-outer-spin-button,
+  .sub-pct-num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+  .sub-pct-num:disabled{opacity:.5;}
+  .sub-row .delete-btn{grid-column:4/5;grid-row:1;width:18px;height:18px;font-size:12px;}
+  .sub-slider-row{grid-column:1/5;grid-row:2;}
+  .sub-slider-row input[type=range]{
+    width:100%;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;outline:none;
+    background:var(--line);
+  }
+  .sub-slider-row input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+    background:var(--accent);cursor:pointer;border:2px solid var(--surface-2);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .sub-slider-row input[type=range]::-moz-range-thumb{
+    width:12px;height:12px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--surface-2);
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .sub-slider-row.snapped input[type=range]::-webkit-slider-thumb{transform:scale(1.4);box-shadow:0 0 0 5px var(--accent-glow);}
+  .sub-slider-row.snapped input[type=range]::-moz-range-thumb{transform:scale(1.4);box-shadow:0 0 0 5px var(--accent-glow);}
+  .sub-info-row{
+    grid-column:1/5;grid-row:3;
+    display:flex;flex-direction:column;gap:6px;
+    font-family:var(--font-sans);font-size:11px;color:var(--muted);
+  }
+  .sub-info-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .sub-info-main label{display:flex;align-items:center;gap:5px;}
+  .sub-curr-input{
+    background:var(--surface);border:1px solid var(--line);border-radius:5px;
+    color:var(--ink);font-family:var(--font-sans);font-size:11px;
+    padding:3px 6px;width:100px;outline:none;
+  }
+  .sub-curr-input:focus{border-color:var(--accent-dim);}
+  .sub-info-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap;row-gap:5px;}
+  .sub-info-stats .stat{color:var(--muted);white-space:nowrap;}
+  .sub-info-stats .stat b{color:var(--ink);font-weight:600;}
+  .sub-info-stats .status-chip{font-size:9.5px;padding:2px 8px;}
+
+  .add-row{
+    display:flex;justify-content:flex-end;margin-bottom:28px;
+  }
+  .btn-ghost{
+    background:transparent;border:1px dashed var(--line);color:var(--muted);
+    font-family:var(--font-sans);font-size:13px;font-weight:500;padding:9px 16px;
+    border-radius:999px;cursor:pointer;
+  }
+  .btn-ghost:hover{border-color:var(--accent-dim);color:var(--accent);}
+
+  .btn-main{
+    width:100%;padding:17px;border-radius:999px;border:none;
+    background:var(--accent);color:var(--on-accent);font-family:var(--font-sans);
+    font-size:15px;font-weight:700;letter-spacing:-.01em;
+    cursor:pointer;margin-bottom:28px;
+  }
+  .btn-main:disabled{background:var(--surface-2);color:var(--muted);cursor:not-allowed;}
+  .btn-main:not(:disabled):hover{filter:brightness(1.15);}
+
+  /* result */
+  .result{
+    border:none;border-radius:20px;overflow:hidden;
+    background:var(--surface);display:none;
+  }
+  .result.show{display:block;}
+  .result-head{
+    padding:18px 20px;border-bottom:1px solid var(--line);
+    font-family:var(--font-sans);font-size:18px;
+    display:flex;justify-content:space-between;align-items:baseline;
+  }
+  .result-head .amt{font-family:var(--font-sans);font-size:18px;color:var(--accent);}
+  .alloc-row{
+    padding:14px 20px;border-bottom:1px solid var(--line);
+    display:flex;justify-content:space-between;align-items:center;gap:12px;
+  }
+  .alloc-row:last-child{border-bottom:none;}
+  .alloc-row .name{font-size:14.5px;display:flex;align-items:center;gap:8px;}
+  .alloc-row .swatch{width:9px;height:9px;border-radius:2px;flex:none;}
+  .alloc-row .amt{font-family:var(--font-sans);font-size:15px;font-weight:600;color:var(--accent);}
+  .alloc-tag{
+    font-family:var(--font-sans);font-size:9px;color:var(--muted);
+    border:1px solid var(--line);border-radius:4px;padding:1px 5px;margin-left:4px;text-transform:uppercase;
+  }
+  .alloc-row .bar-track{
+    flex:1;height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;margin:0 4px;
+  }
+  .alloc-row .bar-fill{height:100%;background:var(--accent);}
+  .alloc-sub-wrap{
+    background:var(--surface-2);border-bottom:1px solid var(--line);padding:2px 20px 8px 40px;
+  }
+  .alloc-sub-wrap:last-child{border-bottom:none;}
+  .alloc-sub-row{
+    display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;
+  }
+  .alloc-sub-row .name{font-size:12.5px;color:var(--muted);}
+  .alloc-sub-row .amt{font-family:var(--font-sans);font-size:12.5px;font-weight:600;color:var(--accent);}
+  .alloc-sub-row .bar-track{
+    flex:1;height:4px;background:var(--surface);border-radius:2px;overflow:hidden;margin:0 4px;
+  }
+  .alloc-sub-row .bar-fill{height:100%;}
+  .empty-note{
+    padding:20px;text-align:center;color:var(--green);font-family:var(--font-sans);font-size:13px;
+  }
+  .status-line{
+    padding:10px 20px 18px;font-family:var(--font-sans);font-size:11.5px;color:var(--muted);
+  }
+
+  .sim-section{
+    border-top:1px solid var(--line);padding:18px 20px 20px;
+  }
+  .sim-title{
+    font-size:12px;color:var(--muted);margin-bottom:10px;
+  }
+  .sim-row{
+    display:grid;grid-template-columns:1fr auto auto auto auto;gap:10px;align-items:center;
+    padding:7px 0;font-family:var(--font-sans);font-size:12px;
+  }
+  .sim-row .sim-name{
+    font-family:var(--font-sans);font-size:13px;color:var(--ink);
+    display:flex;align-items:center;gap:7px;
+  }
+  .sim-row .sim-name .swatch{width:8px;height:8px;border-radius:2px;flex:none;}
+  .sim-row .sim-before{color:var(--muted);}
+  .sim-row .sim-arrow{color:var(--muted);}
+  .sim-row .sim-after{font-weight:600;}
+  .sim-row .sim-after.close{color:var(--green);}
+  .sim-row .sim-after.mid{color:var(--accent);}
+  .sim-row .sim-after.far{color:var(--rust);}
+  .sim-row .sim-target{color:var(--muted);font-size:10.5px;}
+  .save-note{
+    text-align:center;font-family:var(--font-sans);font-size:11px;color:var(--muted);
+    margin-top:18px;opacity:.7;
+  }
+
+  /* ---------------- color picker ---------------- */
+  .color-popover{
+    position:fixed;z-index:1500;background:var(--surface);border:1px solid var(--line);
+    border-radius:16px;padding:12px;box-shadow:0 16px 36px rgba(0,0,0,0.35);
+    display:none;
+  }
+  .color-popover.show{display:block;}
+  .color-grid{display:grid;grid-template-columns:repeat(6,22px);gap:9px;}
+  .color-swatch-btn{
+    width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent;
+    padding:0;transition:transform .1s ease;
+  }
+  .color-swatch-btn:hover{transform:scale(1.15);}
+  .color-swatch-btn.active{border-color:var(--ink);}
+  .color-custom-row{
+    display:flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;
+    color:var(--muted);padding-top:10px;margin-top:10px;border-top:1px solid var(--line);
+  }
+  .color-custom-row input[type=color]{
+    width:26px;height:26px;border:none;border-radius:6px;cursor:pointer;background:none;padding:0;
+  }
+
+  /* ---------------- onboarding ---------------- */
+  .onboarding-overlay{
+    position:fixed;inset:0;background:rgba(6,8,11,0.72);backdrop-filter:blur(3px);
+    display:flex;align-items:center;justify-content:center;z-index:1000;
+    padding:20px;opacity:0;pointer-events:none;transition:opacity .25s ease;
+  }
+  .onboarding-overlay.show{opacity:1;pointer-events:auto;}
+  .onboarding-card{
+    width:100%;max-width:440px;background:var(--surface);border:none;
+    border-radius:22px;overflow:hidden;position:relative;
+    transform:translateY(10px) scale(.98);opacity:0;transition:transform .3s ease, opacity .3s ease;
+    box-shadow:0 30px 60px rgba(0,0,0,0.4);
+  }
+  .onboarding-overlay.show .onboarding-card{transform:translateY(0) scale(1);opacity:1;}
+  .onboarding-close{
+    position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--muted);
+    font-size:20px;line-height:1;cursor:pointer;z-index:2;padding:4px 8px;
+  }
+  .onboarding-close:hover{color:var(--accent);}
+  .onboarding-visual{
+    height:170px;background:var(--surface-2);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
+  }
+  .onboarding-body{padding:22px 24px 6px;}
+  .onboarding-body h2{
+    font-family:var(--font-sans);font-size:19px;margin:0 0 8px;color:var(--ink);font-weight:500;
+  }
+  .onboarding-body p{
+    font-family:var(--font-sans);font-size:13.5px;line-height:1.55;color:var(--muted);margin:0;
+  }
+  .onboarding-dots{display:flex;gap:6px;justify-content:center;padding:16px 0 4px;}
+  .onboarding-dots .dot{width:6px;height:6px;border-radius:50%;background:var(--line);transition:background .2s;}
+  .onboarding-dots .dot.active{background:var(--accent);width:16px;border-radius:3px;}
+  .onboarding-footer{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 24px 22px;gap:10px;flex-wrap:wrap;
+  }
+  .onboarding-check{
+    display:flex;align-items:center;gap:6px;font-family:var(--font-sans);font-size:10.5px;
+    color:var(--muted);cursor:pointer;user-select:none;
+  }
+  .onboarding-check input{accent-color:var(--accent);}
+  .onboarding-nav{display:flex;gap:8px;}
+  .onboarding-nav button{
+    font-family:var(--font-sans);font-size:11.5px;padding:8px 16px;border-radius:6px;cursor:pointer;
+  }
+  .onboarding-nav .btn-back{background:transparent;border:1px solid var(--line);color:var(--muted);}
+  .onboarding-nav .btn-back:hover{border-color:var(--accent-dim);color:var(--accent);}
+  .onboarding-nav .btn-fwd{background:var(--accent);border:none;color:var(--on-accent);font-weight:600;}
+  .onboarding-nav .btn-fwd:hover{opacity:.9;}
+  .help-btn{
+    background:transparent;border:1px solid var(--line);color:var(--muted);
+    font-family:var(--font-sans);font-size:11px;padding:7px 12px;
+    border-radius:7px;cursor:pointer;
+  }
+  .help-btn:hover{border-color:var(--accent-dim);color:var(--accent);}
+
+  /* step 1 — mark/coin pulse */
+  .ob-coin{
+    width:64px;height:64px;border-radius:50%;background:var(--accent);color:var(--on-accent);
+    display:flex;align-items:center;justify-content:center;font-family:var(--font-sans);font-size:26px;font-weight:600;
+    animation:obPulse 2.2s ease-in-out infinite;
+  }
+  @keyframes obPulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+
+  /* step 2 — toggle + slider demo */
+  .ob-demo-row{display:flex;flex-direction:column;gap:14px;width:220px;}
+  .ob-toggle-line{display:flex;align-items:center;gap:10px;}
+  .ob-toggle{
+    width:34px;height:18px;border-radius:10px;background:var(--line);position:relative;flex:none;
+  }
+  .ob-toggle::after{
+    content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:var(--muted);animation:obToggle 2.4s ease-in-out infinite;
+  }
+  @keyframes obToggle{
+    0%,15%{left:2px;background:var(--muted);}
+    45%,70%{left:18px;background:var(--accent);}
+    100%{left:2px;background:var(--muted);}
+  }
+  .ob-toggle-label{font-family:var(--font-sans);font-size:10px;color:var(--muted);}
+  .ob-slider-track{height:4px;background:var(--line);border-radius:2px;position:relative;}
+  .ob-slider-thumb{
+    position:absolute;top:50%;width:12px;height:12px;border-radius:50%;background:var(--accent);
+    transform:translate(-50%,-50%);animation:obSlide 2.4s ease-in-out infinite;
+  }
+  @keyframes obSlide{0%,100%{left:20%;}50%{left:80%;}}
+  .ob-sum{
+    font-family:var(--font-sans);font-size:11px;color:var(--green);text-align:center;
+    animation:obFade 2.4s ease-in-out infinite;
+  }
+  @keyframes obFade{0%,40%{opacity:.4;}50%,90%{opacity:1;}100%{opacity:.4;}}
+
+  /* step 3 — position % fill */
+  .ob-bar-wrap{width:220px;}
+  .ob-bar-track{height:10px;background:var(--line);border-radius:5px;overflow:hidden;margin-top:8px;}
+  .ob-bar-fill{height:100%;background:var(--accent);width:0%;animation:obGrow 2.6s ease-in-out infinite;}
+  @keyframes obGrow{0%{width:0%;}50%{width:62%;}100%{width:0%;}}
+  .ob-bar-label{
+    display:flex;justify-content:space-between;font-family:var(--font-sans);font-size:11px;color:var(--muted);
+  }
+  .ob-bar-label span:last-child{color:var(--accent);}
+
+  /* step 4 — aporte flowing into allocation */
+  .ob-flow{display:flex;align-items:center;gap:10px;}
+  .ob-coin-sm{
+    width:30px;height:30px;border-radius:50%;background:var(--accent);flex:none;
+    animation:obFlow 2.2s ease-in-out infinite;
+  }
+  @keyframes obFlow{0%{transform:translateX(0);opacity:1;}70%{transform:translateX(70px);opacity:.3;}100%{transform:translateX(0);opacity:1;}}
+  .ob-target-bars{display:flex;flex-direction:column;gap:6px;width:130px;}
+  .ob-target-bars .row{height:8px;background:var(--line);border-radius:4px;overflow:hidden;}
+  .ob-target-bars .row span{display:block;height:100%;background:var(--green);}
+  .ob-target-bars .row:nth-child(1) span{width:80%;animation:obFillA 2.2s ease-in-out infinite;}
+  .ob-target-bars .row:nth-child(2) span{width:20%;background:var(--accent);animation:obFillB 2.2s ease-in-out infinite;}
+  @keyframes obFillA{0%,60%{width:20%;}100%{width:80%;}}
+  @keyframes obFillB{0%,60%{width:5%;}100%{width:60%;}}
+
+  /* step — cor personalizada (grade, não mais só 4 opções fixas) */
+  .ob-color-grid{display:grid;grid-template-columns:repeat(7,16px);gap:7px;justify-content:center;}
+  .ob-swatch{width:16px;height:16px;border-radius:50%;animation:obSwatchPop 2s ease-in-out infinite;}
+  .ob-swatch:nth-child(1){background:#8A05BE;animation-delay:0s;}
+  .ob-swatch:nth-child(2){background:#5B3593;animation-delay:.1s;}
+  .ob-swatch:nth-child(3){background:#B9A3DE;animation-delay:.2s;}
+  .ob-swatch:nth-child(4){background:#8C5A3C;animation-delay:.3s;}
+  .ob-swatch:nth-child(5){background:#C9A46B;animation-delay:.4s;}
+  .ob-swatch:nth-child(6){background:#4C8C6B;animation-delay:.5s;}
+  .ob-swatch:nth-child(7){background:#B5563A;animation-delay:.6s;}
+  .ob-swatch:nth-child(8){background:#4D8FD1;animation-delay:.05s;}
+  .ob-swatch:nth-child(9){background:#D8546F;animation-delay:.15s;}
+  .ob-swatch:nth-child(10){background:#E0A639;animation-delay:.25s;}
+  .ob-swatch:nth-child(11){background:#5FB3A3;animation-delay:.35s;}
+  .ob-swatch:nth-child(12){background:#A85CC7;animation-delay:.45s;}
+  .ob-swatch:nth-child(13){background:#3E9E7A;animation-delay:.55s;}
+  .ob-swatch:nth-child(14){background:#6B7FD7;animation-delay:.02s;}
+  @keyframes obSwatchPop{0%,100%{transform:scale(1);}50%{transform:scale(1.3);}}
+  .ob-mode-icon{
+    margin-top:14px;font-family:var(--font-sans);font-size:20px;color:var(--accent);
+    animation:obModeFlip 2.4s ease-in-out infinite;text-align:center;
+  }
+  @keyframes obModeFlip{0%,45%{content:'';}50%{transform:rotateY(180deg);}100%{transform:rotateY(360deg);}}
+
+  /* step — subgrupos */
+  .ob-sub-demo{width:220px;}
+  .ob-sub-parent{
+    display:flex;justify-content:space-between;align-items:center;
+    font-family:var(--font-sans);font-size:12px;color:var(--ink);font-weight:600;
+    padding-bottom:8px;margin-bottom:8px;border-bottom:1px dashed var(--line);
+  }
+  .ob-sub-children{display:flex;flex-direction:column;gap:7px;padding-left:14px;border-left:2px solid var(--line);}
+  .ob-sub-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .ob-sub-row .ob-sub-bar{flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden;}
+  .ob-sub-row .ob-sub-bar span{display:block;height:100%;background:var(--accent);}
+  .ob-sub-row:nth-child(1) .ob-sub-bar span{width:50%;animation:obSubA 2.4s ease-in-out infinite;}
+  .ob-sub-row:nth-child(2) .ob-sub-bar span{width:20%;background:var(--green);animation:obSubB 2.4s ease-in-out infinite;}
+  .ob-sub-row:nth-child(3) .ob-sub-bar span{width:30%;background:var(--under);animation:obSubC 2.4s ease-in-out infinite;}
+  @keyframes obSubA{0%,50%{width:0%;}100%{width:50%;}}
+  @keyframes obSubB{0%,50%{width:0%;}100%{width:20%;}}
+  @keyframes obSubC{0%,50%{width:0%;}100%{width:30%;}}
+  .ob-sub-label{font-family:var(--font-sans);font-size:10.5px;color:var(--muted);width:52px;flex:none;}
+
+  /* step — arrastar para reordenar / apagar */
+  .ob-reorder-demo{display:flex;flex-direction:column;gap:8px;width:200px;}
+  .ob-reorder-row{
+    display:flex;align-items:center;gap:8px;background:var(--surface-2);border-radius:8px;
+    padding:8px 10px;font-family:var(--font-sans);font-size:11.5px;color:var(--ink);
+  }
+  .ob-reorder-row .handle{color:var(--muted);font-size:12px;}
+  .ob-reorder-row:nth-child(1){animation:obReorderA 2.6s ease-in-out infinite;}
+  .ob-reorder-row:nth-child(2){animation:obReorderB 2.6s ease-in-out infinite;}
+  @keyframes obReorderA{0%,20%{transform:translateY(0);}45%,75%{transform:translateY(38px);}100%{transform:translateY(0);}}
+  @keyframes obReorderB{0%,20%{transform:translateY(0);}45%,75%{transform:translateY(-38px);}100%{transform:translateY(0);}}
+  .ob-delete-demo{
+    display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;
+    font-family:var(--font-sans);font-size:10.5px;color:var(--muted);
+  }
+  .ob-delete-x{
+    width:20px;height:20px;border-radius:5px;background:var(--surface-2);color:var(--muted);
+    display:flex;align-items:center;justify-content:center;font-size:12px;
+    animation:obDeleteArm 2.2s ease-in-out infinite;
+  }
+  @keyframes obDeleteArm{
+    0%,30%{background:var(--surface-2);color:var(--muted);transform:scale(1);}
+    50%,80%{background:var(--rust);color:#fff;transform:scale(1.15);}
+    100%{background:var(--surface-2);color:var(--muted);transform:scale(1);}
+  }  /* ---------------- mobile ---------------- */
+  @media (max-width: 640px){
+    body{ padding:20px 14px 60px; }
+    h1{ font-size:26px; }
+
+    .summary{ grid-template-columns:1fr; }
+    .summary .cell{ padding:14px 16px; }
+    .summary .cell .value{ font-size:19px; }
+    .summary .cell input{ font-size:19px; }
+
+    .asset-row{
+      grid-template-columns:16px 30px 1fr 62px 20px;
+      gap:8px 7px;
+      padding:14px 14px;
+    }
+    .asset-name-row{ font-size:14.5px; gap:6px; }
+    .asset-name-row input.rename{ font-size:14.5px; }
+    .pct-display{ font-size:13px; }
+    .pct-display input.pct-num{ width:40px; font-size:12.5px; padding:3px 3px; }
+    .toggle{ width:28px; height:17px; }
+    .toggle::after{ width:11px; height:11px; }
+    .toggle.on::after{ left:13px; }
+    .delete-btn{ width:20px; height:20px; }
+    .drag-handle{ font-size:11px; }
+
+    /* alvo de toque maior no slider — mais fácil de ajustar com o dedo */
+    .slider-row input[type=range]{ height:6px; }
+    .slider-row input[type=range]::-webkit-slider-thumb{ width:22px; height:22px; }
+    .slider-row input[type=range]::-moz-range-thumb{ width:22px; height:22px; }
+
+    .sub-row{ grid-template-columns:16px 1fr 78px 16px; gap:8px; }
+    .sub-slider-row input[type=range]::-webkit-slider-thumb{ width:18px; height:18px; }
+    .sub-slider-row input[type=range]::-moz-range-thumb{ width:18px; height:18px; }
+
+    .value-row-stats, .sub-info-stats{ row-gap:8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="tape-tooltip" id="tapeTooltip"></div>
+
+  <div class="color-popover" id="colorPopover">
+    <div class="color-grid" id="colorGrid"></div>
+    <div class="color-custom-row">
+      <input type="color" id="colorCustomInput">
+      <span>cor personalizada</span>
+    </div>
+  </div>
+
+  <div class="onboarding-overlay" id="onboardingOverlay">
+    <div class="onboarding-card" id="onboardingCard">
+      <button class="onboarding-close" id="onboardingClose">×</button>
+      <div class="onboarding-visual" id="onboardingVisual"></div>
+      <div class="onboarding-body">
+        <h2 id="onboardingTitle"></h2>
+        <p id="onboardingText"></p>
+      </div>
+      <div class="onboarding-dots" id="onboardingDots"></div>
+      <div class="onboarding-footer">
+        <label class="onboarding-check">
+          <input type="checkbox" id="onboardingDontShow"> não mostrar novamente
+        </label>
+        <div class="onboarding-nav">
+          <button class="btn-back" id="onboardingBack">voltar</button>
+          <button class="btn-fwd" id="onboardingNext">próximo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="theme-bar">
+    <button class="help-btn" id="helpBtn">como usar ?</button>
+    <button class="theme-swatch" id="themeAccentSwatch" data-action="opencolor" data-target="theme" title="escolher cor de destaque"></button>
+    <div class="mode-toggle" id="modeToggle">
+      <button data-mode="dark" id="modeDarkBtn">● escuro</button>
+      <button data-mode="light" id="modeLightBtn">○ claro</button>
+    </div>
+  </div>
+
+  <div class="masthead">
+    <div>
+      <h1>Rebalanceador de Carteira</h1>
+    </div>
+    <div class="date-block">
+      <div class="date-label">última atualização</div>
+      <div class="date" id="lastUpdatedDate">—</div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="cell">
+      <div class="label">Patrimônio no plano</div>
+      <div class="value" id="totalPatrimonio">R$ 0,00</div>
+    </div>
+    <div class="cell">
+      <div class="label">Fora da meta (%)</div>
+      <div class="value" id="pctOffTarget">R$ 0,00</div>
+    </div>
+    <div class="cell accent">
+      <div class="label">Aporte deste mês</div>
+      <input type="text" id="aporteInput" placeholder="R$ 0,00" inputmode="decimal">
+    </div>
+  </div>
+
+  <div class="tape">
+    <p class="tape-label">Meta vs. posição atual</p>
+    <div class="tape-bar" id="tapeTarget"></div>
+    <div class="tape-bar" id="tapeCurrent" style="margin-top:4px;"></div>
+    <div class="tape-legend" id="tapeLegend"></div>
+  </div>
+
+  <div class="pct-total" id="pctTotal"></div>
+
+  <div class="assets" id="assetList"></div>
+
+  <div class="add-row">
+    <button class="btn-ghost" id="addAssetBtn">+ adicionar grupo</button>
+  </div>
+
+  <button class="btn-main" id="calcBtn">Calcular alocação do mês</button>
+
+  <div class="result" id="result">
+    <div class="result-head">
+      <span>Onde colocar o aporte</span>
+      <span class="amt" id="resultTotal">R$ 0,00</span>
+    </div>
+    <div id="resultBody"></div>
+    <div class="status-line" id="resultStatus"></div>
+
+    <div class="sim-section" id="simSection">
+      <div class="sim-title">Como fica a carteira depois desse aporte</div>
+      <div class="tape-bar" id="simTapeBar" style="margin-top:8px;"></div>
+      <div id="simRows"></div>
+    </div>
+  </div>
+
+  <p class="save-note" id="saveNote">alterações salvas neste navegador/computador</p>
+  <p class="save-note" style="margin-top:4px;">dados salvos só neste navegador · nada é enviado a servidor nenhum</p>
+
+</div>
+
+<script>
+const fmt = v => 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const parseNum = s => {
+  if(typeof s === 'number') return s;
+  if(!s) return 0;
+  let clean = String(s).replace(/[^\d,.-]/g,'');
+  // handle pt-BR format: 1.234,56
+  if(clean.includes(',') && clean.includes('.')){
+    clean = clean.replace(/\./g,'').replace(',', '.');
+  } else if(clean.includes(',')){
+    clean = clean.replace(',', '.');
+  }
+  const n = parseFloat(clean);
+  return isNaN(n) ? 0 : n;
+};
+
+const ROW_COLORS = ['#c6a15b','#4c8c6b','#8a9bb5','#b5563a','#6e8a9c','#9c7bb5','#7fa15b','#b58a3a'];
+
+// grupos padrão zerados — feito para ser compartilhado; cada pessoa preenche seus próprios números
+const DEFAULT_ASSETS = [
+  {id:'infl',   name:'Fixa inflação',   pct:0, current:0, active:true, subgroups:[], color:null},
+  {id:'intl',   name:'Internacional',   pct:0, current:0, active:true, subgroups:[], color:null},
+  {id:'acoes',  name:'Ações',           pct:0, current:0, active:true, subgroups:[], color:null},
+  {id:'imob',   name:'Imobiliário',     pct:0, current:0, active:true, subgroups:[], color:null},
+  {id:'prefix', name:'Fixa prefixada',  pct:0, current:0, active:true, subgroups:[], color:null},
+  {id:'posfix', name:'Fixa pós-fixada', pct:0, current:0, active:true, subgroups:[], color:null},
+  {id:'cripto', name:'Cripto',          pct:0, current:0, active:true, subgroups:[], color:null},
+  {id:'ouro',   name:'Ouro',            pct:0, current:0, active:true, subgroups:[], color:null},
+];
+
+let assets = [];
+let aporte = 0;
+const STORAGE_KEY = 'portfolio-rebalance-state';
+const THEME_KEY = 'portfolio-rebalance-theme';
+
+function colorFor(idx, a){
+  if(a && a.color) return a.color;
+  return ROW_COLORS[idx % ROW_COLORS.length];
+}
+const CURATED_COLORS = [
+  '#8A05BE', // roxo característico da masterbrand Nubank
+  '#5B3593', '#B9A3DE', '#8C5A3C', '#C9A46B', // paleta Ultravioleta: UV Purple, Purple 100, Brown, Tan
+  '#C6A15B', '#4C8C6B', '#8A9BB5', '#B5563A', '#6E8A9C',
+  '#9C7BB5', '#7FA15B', '#D8546F', '#4D8FD1', '#E0A639',
+  '#5FB3A3', '#A85CC7', '#3E9E7A', '#C4574A', '#6B7FD7', '#E08C3E',
+];
+
+// subgrupos ativos existem? então o valor do grupo é a soma deles (campo trava);
+// senão, usa o valor digitado diretamente no grupo
+function hasActiveSubgroups(a){ return !!(a.subgroups && a.subgroups.some(s=>s.active)); }
+function getGroupCurrent(a){
+  if(hasActiveSubgroups(a)){
+    return a.subgroups.filter(s=>s.active).reduce((sum,s)=>sum+Number(s.current||0),0);
+  }
+  return Number(a.current||0);
+}
+function subPctSum(a){
+  if(!a.subgroups) return 0;
+  return a.subgroups.filter(s=>s.active).reduce((s,x)=>s+Number(x.pct||0),0);
+}
+
+// classifica o desvio em pontos percentuais: exato, dentro de uma margem aceitável (neutro),
+// ou fora da meta (abaixo/acima) — usado tanto nos grupos quanto nos subgrupos
+const DIFF_EXACT_BAND = 0.5;   // pp
+const DIFF_OK_BAND = 2;        // pp
+function diffStatus(currentPct, targetPct){
+  const diffPP = targetPct - currentPct; // positivo = abaixo da meta, negativo = acima
+  const abs = Math.abs(diffPP);
+  if(abs < DIFF_EXACT_BAND) return 'zero';
+  if(abs < DIFF_OK_BAND) return 'ok';
+  return diffPP > 0 ? 'under' : 'over';
+}
+function diffStatusLabel(cls, diffRs){
+  if(cls==='zero') return 'na meta';
+  if(cls==='ok') return 'dentro da margem';
+  return diffRs>0 ? 'faltam '+fmt(diffRs) : 'acima em '+fmt(-diffRs);
+}
+
+// trilha preenchida até o valor atual — mais confiável e bonito do que tentar alinhar
+// marcadores de 5 em 5 na trilha nativa do range (que tem um respiro nas pontas pro polegar)
+function sliderFillBg(pct){
+  const p = Math.max(0, Math.min(100, pct));
+  return `linear-gradient(to right, var(--accent) 0%, var(--accent) ${p}%, var(--line) ${p}%, var(--line) 100%)`;
+}
+
+function renderSubgroupBlock(a, parentTargetVal){
+  const subs = a.subgroups || [];
+  const activeSubs = subs.filter(s=>s.active);
+  const sum = subPctSum(a);
+  const sumOk = Math.abs(sum-100) < 0.01;
+
+  if(subs.length===0){
+    return `<button class="add-sub-btn" data-action="addsub" data-id="${a.id}">+ subgrupos</button>`;
+  }
+
+  const rows = subs.map(s=>{
+    const subTargetVal = parentTargetVal * (Number(s.pct||0)/100);
+    const diff = subTargetVal - Number(s.current||0);
+    const groupCur = getGroupCurrent(a);
+    const ofGroupPct = groupCur>0 ? (Number(s.current||0)/groupCur*100) : 0;
+    const diffClass = diffStatus(ofGroupPct, Number(s.pct||0));
+    const diffLabel = diffStatusLabel(diffClass, diff);
+    return `
+      <div class="sub-row" id="subrow-${s.id}">
+        <button class="toggle toggle-sm ${s.active?'on':''}" data-action="subtoggle" data-id="${a.id}" data-subid="${s.id}"></button>
+        <input class="rename sub-rename" data-action="subrename" data-id="${a.id}" data-subid="${s.id}" value="${s.name}" ${s.active?'':'disabled'}>
+        <div class="sub-pct-display">
+          <input type="number" class="pct-num sub-pct-num" id="subpctnum-${s.id}" data-action="subpctnum" data-id="${a.id}" data-subid="${s.id}"
+                 value="${Number(s.pct).toFixed(1)}" min="0" max="100" step="0.1" ${s.active?'':'disabled'}>%
+        </div>
+        <button class="delete-btn" data-action="subdelete" data-id="${a.id}" data-subid="${s.id}" title="remover subgrupo">×</button>
+        <div class="sub-slider-row" id="subsliderrow-${s.id}">
+          <input type="range" id="subpctslider-${s.id}" min="0" max="100" step="0.1" value="${s.pct}" data-action="subslider" data-id="${a.id}" data-subid="${s.id}" ${s.active?'':'disabled'}
+                 style="background:${sliderFillBg(s.pct)}">
+        </div>
+        <div class="sub-info-row">
+          <div class="sub-info-main">
+            <label>posição atual
+              <input class="curr-input sub-curr-input" data-action="subcurrent" data-id="${a.id}" data-subid="${s.id}" value="${fmt(s.current)}" ${s.active?'':'disabled'}>
+            </label>
+          </div>
+          <div class="sub-info-stats">
+            <span class="stat">hoje <b>${ofGroupPct.toFixed(1)}%</b> do grupo</span>
+            <span class="stat" id="subtargetval-${s.id}">meta <b>${fmt(subTargetVal)}</b></span>
+            <span class="status-chip ${diffClass}" id="subdiffval-${s.id}">${diffLabel}</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="subgroups-block">
+      <div class="sub-sum ${sumOk?'ok':'bad'}" id="subsum-${a.id}">
+        <span>soma dos subgrupos</span><span>${sum.toFixed(1)}% ${sumOk?'— fechado':'— deveria fechar em 100%'}</span>
+      </div>
+      ${rows}
+      <button class="add-sub-btn" data-action="addsub" data-id="${a.id}">+ adicionar subgrupo</button>
+    </div>`;
+}
+
+// "ímã" nos múltiplos de 5 — se o valor bruto do slider estiver perto de um
+// múltiplo de 5, gruda nele (mais fácil acertar 30% em vez de 30.1%)
+const SNAP_STEP = 5;
+const SNAP_THRESHOLD = 0.6;
+function snapPct(raw){
+  const nearest = Math.round(raw / SNAP_STEP) * SNAP_STEP;
+  if(Math.abs(raw - nearest) <= SNAP_THRESHOLD){
+    return Math.max(0, Math.min(100, nearest));
+  }
+  return raw;
+}
+
+// quanto ainda cabe até fechar 100% — usado pra nunca deixar passar do total,
+// tanto entre os grupos quanto entre os subgrupos de um mesmo grupo
+function remainingTopPct(excludeId){
+  const otherSum = activeAssets()
+    .filter(x=>x.id!==excludeId)
+    .reduce((s,x)=>s+Number(x.pct||0),0);
+  return Math.max(0, 100 - otherSum);
+}
+function remainingSubPct(a, excludeSubId){
+  const otherSum = (a.subgroups||[])
+    .filter(s=>s.active && s.id!==excludeSubId)
+    .reduce((s,x)=>s+Number(x.pct||0),0);
+  return Math.max(0, 100 - otherSum);
+}
+// dá um "feedback" visual (e vibração em telas de toque, se disponível) quando gruda num valor redondo
+function pulseSnap(rowElId){
+  const row = document.getElementById(rowElId);
+  if(row){
+    row.classList.add('snapped');
+    clearTimeout(row._snapTimer);
+    row._snapTimer = setTimeout(()=>row.classList.remove('snapped'), 160);
+  }
+  try{ if(navigator.vibrate) navigator.vibrate(8); }catch(e){}
+}
+
+// confirmação de exclusão em 2 cliques (sem depender de window.confirm, que fica bloqueado
+// em alguns contextos incorporados/sandboxed) — 1º clique arma, 2º clique dentro de 3s confirma
+let armedDeleteBtn = null;
+function armDelete(btn){
+  if(armedDeleteBtn && armedDeleteBtn!==btn) disarmDelete(armedDeleteBtn);
+  btn.classList.add('armed');
+  btn.textContent = '✓';
+  btn.title = 'clique de novo para confirmar';
+  armedDeleteBtn = btn;
+  clearTimeout(btn._armTimer);
+  btn._armTimer = setTimeout(()=>disarmDelete(btn), 3000);
+}
+function disarmDelete(btn){
+  if(!btn) return;
+  btn.classList.remove('armed');
+  btn.textContent = '×';
+  btn.title = btn.dataset.subid ? 'remover subgrupo' : 'remover grupo';
+  if(armedDeleteBtn===btn) armedDeleteBtn = null;
+}
+document.addEventListener('click', e=>{
+  if(armedDeleteBtn && e.target!==armedDeleteBtn) disarmDelete(armedDeleteBtn);
+}, true);
+
+/* ---------------- seletor de cor (grupo ou tema) ---------------- */
+let colorPopoverTargetId = null;
+let colorPopoverMode = null; // 'group' | 'theme'
+
+function openColorPopover(anchorEl, mode, assetId){
+  let currentColor;
+  if(mode==='theme'){
+    currentColor = currentAccent;
+  } else {
+    const a = assets.find(x=>x.id===assetId);
+    if(!a) return;
+    currentColor = a.color || colorFor(assets.indexOf(a), a);
+  }
+  colorPopoverMode = mode;
+  colorPopoverTargetId = mode==='theme' ? 'theme' : assetId;
+
+  const pop = document.getElementById('colorPopover');
+  const grid = document.getElementById('colorGrid');
+  grid.innerHTML = '';
+  CURATED_COLORS.forEach(col=>{
+    const b = document.createElement('button');
+    b.className = 'color-swatch-btn' + (currentColor.toLowerCase()===col.toLowerCase() ? ' active':'');
+    b.style.background = col;
+    b.title = col;
+    b.addEventListener('click', ()=>{
+      applyColorChoice(mode, assetId, col);
+      closeColorPopover();
+    });
+    grid.appendChild(b);
+  });
+  const customInput = document.getElementById('colorCustomInput');
+  customInput.value = currentColor;
+  customInput.onchange = ()=>{
+    applyColorChoice(mode, assetId, customInput.value);
+    closeColorPopover();
+  };
+
+  const rect = anchorEl.getBoundingClientRect();
+  pop.style.display = 'block'; // mede antes de posicionar
+  const popW = pop.offsetWidth, popH = pop.offsetHeight;
+  let top = rect.bottom + 8;
+  let left = rect.left;
+  if(left + popW > window.innerWidth - 10) left = window.innerWidth - popW - 10;
+  if(top + popH > window.innerHeight - 10) top = rect.top - popH - 8;
+  pop.style.top = top + 'px';
+  pop.style.left = left + 'px';
+  pop.classList.add('show');
+}
+function applyColorChoice(mode, assetId, hex){
+  if(mode==='theme'){
+    currentAccent = hex;
+    applyTheme(); saveTheme();
+  } else {
+    const a = assets.find(x=>x.id===assetId);
+    if(a){ a.color = hex; render(); saveState(); }
+  }
+}
+function closeColorPopover(){
+  const pop = document.getElementById('colorPopover');
+  pop.classList.remove('show');
+  pop.style.display = ''; // remove o inline forçado pela medição, senão nunca fecha de fato
+  colorPopoverTargetId = null;
+  colorPopoverMode = null;
+}
+document.addEventListener('click', e=>{
+  const opener = e.target.closest('[data-action="opencolor"]');
+  if(opener){
+    const mode = opener.dataset.target === 'theme' ? 'theme' : 'group';
+    const id = mode==='theme' ? 'theme' : opener.dataset.id;
+    if(colorPopoverTargetId===id && colorPopoverMode===mode){ closeColorPopover(); }
+    else{ openColorPopover(opener, mode, opener.dataset.id); }
+    return;
+  }
+  if(colorPopoverTargetId && !e.target.closest('#colorPopover')) closeColorPopover();
+});
+
+/* ---------------- theme engine ---------------- */
+const MODES = {
+  dark:{
+    bg:'#000000', surface:'#161616', 'surface-2':'#212121', line:'#333333',
+    ink:'#f5f5f5', muted:'#9a9a9a',
+    green:'#5a9c7a', 'green-dim':'#2c4237', rust:'#c1684a', 'rust-dim':'#4a2c22',
+    neutral:'#8e9bc4', 'neutral-dim':'#2a2f45',
+    under:'#4FB8AE', 'under-dim':'#1c3d3a',
+  },
+  light:{
+    bg:'#ffffff', surface:'#f7f7f7', 'surface-2':'#efefef', line:'#dcdcdc',
+    ink:'#1a1a1a', muted:'#6b6b6b',
+    green:'#3f7d58', 'green-dim':'#d7ebe0', rust:'#a8462f', 'rust-dim':'#f3ddd5',
+    neutral:'#4f5f8c', 'neutral-dim':'#dde1ef',
+    under:'#1f7a70', 'under-dim':'#dcefec',
+  }
+};
+// migração: quem tinha uma das 4 paletas fixas antigas salva, mantém a cor equivalente
+const LEGACY_PALETTE_HEX = {
+  uvpurple:'#5B3593', purple100:'#B9A3DE', brown:'#8C5A3C', tan:'#C9A46B',
+  ouro:'#c6a15b', esmeralda:'#6fa98b', safira:'#7c93c4', ameixa:'#b487a6',
+};
+let currentMode = 'dark';
+let currentAccent = '#5B3593'; // UV Purple como padrão
+
+function hexToRgb(hex){
+  const h = hex.replace('#','');
+  const n = parseInt(h.length===3 ? h.split('').map(c=>c+c).join('') : h, 16);
+  return [(n>>16)&255, (n>>8)&255, n&255];
+}
+function rgbToHex(r,g,b){
+  return '#' + [r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+}
+// mistura duas cores (weightB = quanto de hexB entra, 0 a 1)
+function blendHex(hexA, hexB, weightB){
+  const [r1,g1,b1] = hexToRgb(hexA), [r2,g2,b2] = hexToRgb(hexB);
+  return rgbToHex(r1*(1-weightB)+r2*weightB, g1*(1-weightB)+g2*weightB, b1*(1-weightB)+b2*weightB);
+}
+// escolhe texto claro ou escuro conforme a luminância da cor de fundo, pra qualquer acento
+function contrastFor(hex){
+  const [r,g,b] = hexToRgb(hex);
+  const lum = (0.299*r + 0.587*g + 0.114*b)/255;
+  return lum > 0.6 ? '#1a1414' : '#ffffff';
+}
+
+function applyTheme(){
+  const m = MODES[currentMode];
+  const root = document.documentElement.style;
+  Object.entries(m).forEach(([k,v])=>root.setProperty('--'+k, v));
+  root.setProperty('--accent', currentAccent);
+  // tom "dim" calculado na hora, misturando o acento com a superfície do modo atual —
+  // funciona pra qualquer cor escolhida, não só as pré-definidas
+  root.setProperty('--accent-dim', blendHex(currentAccent, m['surface-2'], 0.7));
+  root.setProperty('--on-accent', contrastFor(currentAccent));
+  const [r,g,b] = hexToRgb(currentAccent);
+  root.setProperty('--accent-glow', `rgba(${r},${g},${b},0.10)`);
+
+  // trava o esquema de cor da página no modo escolhido, em vez de herdar do SO/navegador
+  document.documentElement.style.colorScheme = currentMode;
+  document.documentElement.setAttribute('data-theme', currentMode);
+
+  document.getElementById('modeDarkBtn').classList.toggle('active', currentMode==='dark');
+  document.getElementById('modeLightBtn').classList.toggle('active', currentMode==='light');
+
+  const themeSwatch = document.getElementById('themeAccentSwatch');
+  if(themeSwatch) themeSwatch.style.background = currentAccent;
+}
+function saveTheme(){
+  try{ localStorage.setItem(THEME_KEY, JSON.stringify({mode:currentMode, accent:currentAccent})); }catch(e){}
+}
+function loadTheme(){
+  try{
+    const raw = localStorage.getItem(THEME_KEY);
+    if(raw){
+      const p = JSON.parse(raw);
+      if(MODES[p.mode]) currentMode = p.mode;
+      if(p.accent && /^#[0-9a-fA-F]{6}$/.test(p.accent)) currentAccent = p.accent;
+      else if(p.palette && LEGACY_PALETTE_HEX[p.palette]) currentAccent = LEGACY_PALETTE_HEX[p.palette];
+    }
+  }catch(e){}
+}
+document.getElementById('modeDarkBtn').addEventListener('click', ()=>{ currentMode='dark'; applyTheme(); saveTheme(); });
+document.getElementById('modeLightBtn').addEventListener('click', ()=>{ currentMode='light'; applyTheme(); saveTheme(); });
+/* ------------------------------------------------ */
+
+let lastUpdated = null;
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      assets = parsed.assets || DEFAULT_ASSETS.map(a=>({...a}));
+      assets.forEach(a=>{ if(!Array.isArray(a.subgroups)) a.subgroups = []; if(a.color===undefined) a.color = null; });
+      aporte = parsed.aporte || 0;
+      lastUpdated = parsed.lastUpdated || null;
+      return;
+    }
+  }catch(e){ /* localStorage indisponível (ex: aberto direto do file:// em alguns navegadores) */ }
+  assets = DEFAULT_ASSETS.map(a=>({...a}));
+  aporte = 0;
+  lastUpdated = null;
+}
+
+function renderLastUpdated(){
+  const el = document.getElementById('lastUpdatedDate');
+  if(!el) return;
+  if(!lastUpdated){ el.textContent = 'ainda não editado'; return; }
+  const d = new Date(lastUpdated);
+  el.textContent = d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'}) +
+    ' às ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+}
+
+let saveTimer = null;
+function saveState(){
+  const note = document.getElementById('saveNote');
+  note.textContent = 'salvando...';
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>{
+    try{
+      lastUpdated = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({assets, aporte, lastUpdated}));
+      note.textContent = 'alterações salvas neste navegador/computador';
+      renderLastUpdated();
+    }catch(e){
+      note.textContent = 'não foi possível salvar automaticamente — seu navegador está bloqueando armazenamento local';
+    }
+  }, 400);
+}
+
+function activeAssets(){ return assets.filter(a=>a.active); }
+function pctSum(){ return activeAssets().reduce((s,a)=>s+Number(a.pct||0),0); }
+function totalPatrimonio(){ return activeAssets().reduce((s,a)=>s+getGroupCurrent(a),0); }
+
+function render(){
+  renderLastUpdated();
+  document.getElementById('aporteInput').value = aporte ? fmt(aporte) : '';
+
+  const total = totalPatrimonio();
+  document.getElementById('totalPatrimonio').textContent = fmt(total);
+
+  // deviation sum
+  let offTarget = 0;
+  activeAssets().forEach(a=>{
+    const targetVal = total * (a.pct/100);
+    offTarget += Math.abs(targetVal - getGroupCurrent(a));
+  });
+  document.getElementById('pctOffTarget').textContent = fmt(offTarget);
+
+  // pct total indicator
+  const sum = pctSum();
+  const pctEl = document.getElementById('pctTotal');
+  pctEl.className = 'pct-total ' + (Math.abs(sum-100)<0.01 ? 'ok' : 'bad');
+  pctEl.innerHTML = `<span>Soma das metas ativas</span><span>${sum.toFixed(1)}% ${Math.abs(sum-100)<0.01 ? '— fechado' : (sum>100? '— acima de 100%' : '— faltam '+(100-sum).toFixed(1)+'%')}</span>`;
+
+  // tape bars
+  const tapeTarget = document.getElementById('tapeTarget');
+  const tapeCurrent = document.getElementById('tapeCurrent');
+  const legend = document.getElementById('tapeLegend');
+  tapeTarget.innerHTML=''; tapeCurrent.innerHTML=''; legend.innerHTML='';
+  activeAssets().forEach((a,i)=>{
+    const c = colorFor(assets.indexOf(a), a);
+    const tSeg = document.createElement('div');
+    tSeg.className='seg'; tSeg.id='tapeT-'+a.id; tSeg.style.width = a.pct+'%'; tSeg.style.background=c;
+    tSeg.dataset.name = a.name; tSeg.dataset.pct = a.pct.toFixed(1); tSeg.dataset.kind = 'meta';
+    tapeTarget.appendChild(tSeg);
+    const curPct = total>0 ? (getGroupCurrent(a)/total*100) : 0;
+    const cSeg = document.createElement('div');
+    cSeg.className='seg'; cSeg.id='tapeC-'+a.id; cSeg.style.width = curPct+'%'; cSeg.style.background=c; cSeg.style.opacity='0.55';
+    cSeg.dataset.name = a.name; cSeg.dataset.pct = curPct.toFixed(1); cSeg.dataset.kind = 'hoje';
+    tapeCurrent.appendChild(cSeg);
+    const item = document.createElement('div');
+    item.className='item';
+    item.innerHTML = `<span class="dot" style="background:${c}"></span>${a.name}`;
+    legend.appendChild(item);
+  });
+
+  // asset rows
+  const list = document.getElementById('assetList');
+  list.innerHTML='';
+  assets.forEach((a,idx)=>{
+    const c = colorFor(idx, a);
+    const row = document.createElement('div');
+    row.className = 'asset-row' + (a.active ? '' : ' disabled');
+    row.id = 'row-'+a.id;
+
+    const targetVal = total * (a.pct/100);
+    const diff = targetVal - getGroupCurrent(a);
+    const currPct = total>0 ? (getGroupCurrent(a)/total*100) : 0;
+    const diffClass = diffStatus(currPct, a.pct);
+    const diffLabel = diffStatusLabel(diffClass, diff);
+    const locked = hasActiveSubgroups(a);
+    const groupCurrentVal = getGroupCurrent(a);
+
+    row.innerHTML = `
+      <span class="drag-handle" draggable="true" data-id="${a.id}" title="arrastar para reordenar">⠿</span>
+      <button class="toggle ${a.active?'on':''}" data-action="toggle" data-id="${a.id}"></button>
+      <div class="asset-name-row">
+        <button class="swatch" style="background:${c}" data-action="opencolor" data-target="group" data-id="${a.id}" title="escolher cor"></button>
+        <input class="rename" data-action="rename" data-id="${a.id}" value="${a.name}">
+      </div>
+      <div class="pct-display">
+        <input type="number" class="pct-num" id="pctnum-${a.id}" data-action="pctnum" data-id="${a.id}"
+               value="${Number(a.pct).toFixed(1)}" min="0" max="100" step="0.1" ${a.active?'':'disabled'}>%
+      </div>
+      <div class="slider-row" id="sliderrow-${a.id}">
+        <input type="range" id="pctslider-${a.id}" min="0" max="100" step="0.1" value="${a.pct}" data-action="slider" data-id="${a.id}" ${a.active?'':'disabled'}
+               style="background:${sliderFillBg(a.pct)}">
+        <div class="scale-labels"><span>0%</span><span>50%</span><span>100%</span></div>
+      </div>
+      <div class="value-row">
+        <div class="value-row-main">
+          <label>posição atual
+            <input class="curr-input" data-action="current" data-id="${a.id}"
+                   value="${fmt(locked ? groupCurrentVal : a.current)}" ${(a.active && !locked)?'':'disabled'}
+                   title="${locked ? 'travado: soma dos subgrupos ativos' : ''}">
+          </label>
+          ${locked ? '<span class="locked-note">= soma dos subgrupos</span>' : ''}
+        </div>
+        <div class="value-row-stats">
+          <span class="stat" id="currpct-${a.id}">hoje <b>${currPct.toFixed(1)}%</b> da carteira</span>
+          <span class="stat" id="targetval-${a.id}">meta <b>${fmt(targetVal)}</b></span>
+          <span class="status-chip ${diffClass}" id="diffval-${a.id}">${diffLabel}</span>
+        </div>
+      </div>
+      <button class="delete-btn" data-action="delete" data-id="${a.id}" title="remover grupo">×</button>
+      <div class="sub-area">
+        ${renderSubgroupBlock(a, targetVal)}
+      </div>
+    `;
+    list.appendChild(row);
+  });
+
+  document.getElementById('calcBtn').disabled = Math.abs(sum-100) > 0.01;
+  document.getElementById('result').classList.remove('show');
+}
+
+// atualização leve, chamada a cada movimento do slider/campo de % — não recria o DOM,
+// então o arrasto do slider fica fluido e não perde o foco/posição do ponteiro
+function liveUpdate(){
+  const total = totalPatrimonio();
+  document.getElementById('totalPatrimonio').textContent = fmt(total);
+
+  let offTarget = 0;
+  const sum = pctSum();
+  activeAssets().forEach(a=>{
+    const targetVal = total * (a.pct/100);
+    offTarget += Math.abs(targetVal - getGroupCurrent(a));
+
+    const targetEl = document.getElementById('targetval-'+a.id);
+    const diffEl = document.getElementById('diffval-'+a.id);
+    const currPctEl = document.getElementById('currpct-'+a.id);
+    if(targetEl) targetEl.innerHTML = 'meta <b>' + fmt(targetVal) + '</b>';
+    const currPct = total>0 ? (getGroupCurrent(a)/total*100) : 0;
+    if(currPctEl){
+      currPctEl.innerHTML = 'hoje <b>' + currPct.toFixed(1) + '%</b> da carteira';
+    }
+    if(diffEl){
+      const diff = targetVal - getGroupCurrent(a);
+      const diffClass = diffStatus(currPct, a.pct);
+      diffEl.className = 'status-chip ' + diffClass;
+      diffEl.textContent = diffStatusLabel(diffClass, diff);
+    }
+    const tSeg = document.getElementById('tapeT-'+a.id);
+    if(tSeg){ tSeg.style.width = a.pct+'%'; tSeg.dataset.pct = a.pct.toFixed(1); }
+    const cSegLive = document.getElementById('tapeC-'+a.id);
+    if(cSegLive){ cSegLive.dataset.pct = currPct.toFixed(1); }
+
+    // subgrupos herdam a meta em R$ do grupo-pai — atualiza os deles também
+    const groupCur = getGroupCurrent(a);
+    (a.subgroups||[]).forEach(s=>{
+      const subTargetVal = targetVal * (Number(s.pct||0)/100);
+      const subTargetEl = document.getElementById('subtargetval-'+s.id);
+      const subDiffEl = document.getElementById('subdiffval-'+s.id);
+      if(subTargetEl) subTargetEl.innerHTML = 'meta <b>' + fmt(subTargetVal) + '</b>';
+      if(subDiffEl){
+        const d = subTargetVal - Number(s.current||0);
+        const ofGroupPct = groupCur>0 ? (Number(s.current||0)/groupCur*100) : 0;
+        const dClass = diffStatus(ofGroupPct, Number(s.pct||0));
+        subDiffEl.className = 'status-chip ' + dClass;
+        subDiffEl.textContent = diffStatusLabel(dClass, d);
+      }
+    });
+  });
+  document.getElementById('pctOffTarget').textContent = fmt(offTarget);
+
+  const pctEl = document.getElementById('pctTotal');
+  pctEl.className = 'pct-total ' + (Math.abs(sum-100)<0.01 ? 'ok' : 'bad');
+  pctEl.innerHTML = `<span>Soma das metas ativas</span><span>${sum.toFixed(1)}% ${Math.abs(sum-100)<0.01 ? '— fechado' : (sum>100? '— acima de 100%' : '— faltam '+(100-sum).toFixed(1)+'%')}</span>`;
+  document.getElementById('calcBtn').disabled = Math.abs(sum-100) > 0.01;
+}
+
+function attachHandlers(){
+  /* ---- tooltip ao passar o mouse nos segmentos da barra meta/posição atual ---- */
+  const tapeTooltip = document.getElementById('tapeTooltip');
+  function showTapeTooltip(seg, evt){
+    if(!seg.dataset.name) return;
+    tapeTooltip.textContent = `${seg.dataset.name} · ${seg.dataset.kind} ${seg.dataset.pct}%`;
+    tapeTooltip.classList.add('show');
+    positionTapeTooltip(seg, evt);
+  }
+  function positionTapeTooltip(seg, evt){
+    const rect = seg.getBoundingClientRect();
+    const x = evt ? evt.clientX : (rect.left + rect.width/2);
+    tapeTooltip.style.left = Math.min(Math.max(x, 60), window.innerWidth-60) + 'px';
+    tapeTooltip.style.top = (rect.top - 12) + 'px';
+  }
+  function hideTapeTooltip(){ tapeTooltip.classList.remove('show'); }
+  ['tapeTarget','tapeCurrent'].forEach(id=>{
+    const el = document.getElementById(id);
+    el.addEventListener('mouseover', e=>{
+      const seg = e.target.closest('.seg');
+      if(seg) showTapeTooltip(seg, e);
+    });
+    el.addEventListener('mousemove', e=>{
+      const seg = e.target.closest('.seg');
+      if(seg) positionTapeTooltip(seg, e);
+    });
+    el.addEventListener('mouseout', e=>{
+      if(!e.relatedTarget || !e.relatedTarget.closest('.seg')) hideTapeTooltip();
+    });
+  });
+
+  document.getElementById('assetList').addEventListener('click', e=>{
+    const toggleBtn = e.target.closest('[data-action="toggle"]');
+    if(toggleBtn){
+      const a = assets.find(x=>x.id===toggleBtn.dataset.id);
+      a.active = !a.active;
+      render(); saveState();
+      return;
+    }
+    const delBtn = e.target.closest('[data-action="delete"]');
+    if(delBtn){
+      if(!delBtn.classList.contains('armed')){
+        armDelete(delBtn);
+        return;
+      }
+      const a = assets.find(x=>x.id===delBtn.dataset.id);
+      if(a){
+        assets = assets.filter(x=>x.id!==delBtn.dataset.id);
+        render(); saveState();
+      }
+      return;
+    }
+    const subToggleBtn = e.target.closest('[data-action="subtoggle"]');
+    if(subToggleBtn){
+      const a = assets.find(x=>x.id===subToggleBtn.dataset.id);
+      const s = a && a.subgroups.find(x=>x.id===subToggleBtn.dataset.subid);
+      if(s){ s.active = !s.active; render(); saveState(); }
+      return;
+    }
+    const subDelBtn = e.target.closest('[data-action="subdelete"]');
+    if(subDelBtn){
+      if(!subDelBtn.classList.contains('armed')){
+        armDelete(subDelBtn);
+        return;
+      }
+      const a = assets.find(x=>x.id===subDelBtn.dataset.id);
+      if(a){
+        a.subgroups = a.subgroups.filter(x=>x.id!==subDelBtn.dataset.subid);
+        render(); saveState();
+      }
+      return;
+    }
+    const addSubBtn = e.target.closest('[data-action="addsub"]');
+    if(addSubBtn){
+      const a = assets.find(x=>x.id===addSubBtn.dataset.id);
+      if(a){
+        if(!Array.isArray(a.subgroups)) a.subgroups = [];
+        const n = a.subgroups.length;
+        // se é o primeiro subgrupo, começa com 100%; senão entra com 0% pra não estourar a soma
+        const startPct = n===0 ? 100 : 0;
+        a.subgroups.push({
+          id: 'sub'+Date.now()+Math.floor(Math.random()*1000),
+          name: 'Novo subgrupo',
+          pct: startPct,
+          current: 0,
+          active: true
+        });
+        render(); saveState();
+      }
+      return;
+    }
+  });
+
+  /* ---- arrastar para reordenar (pega pela alça ⠿) ---- */
+  const list = document.getElementById('assetList');
+  let dragSourceId = null;
+
+  list.addEventListener('dragstart', e=>{
+    const handle = e.target.closest('.drag-handle');
+    if(!handle) return;
+    dragSourceId = handle.dataset.id;
+    const row = document.getElementById('row-'+dragSourceId);
+    if(row){
+      row.classList.add('dragging');
+      try{ e.dataTransfer.setDragImage(row, 20, 20); }catch(err){}
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    try{ e.dataTransfer.setData('text/plain', dragSourceId); }catch(err){}
+  });
+
+  list.addEventListener('dragover', e=>{
+    if(!dragSourceId) return;
+    e.preventDefault();
+    const row = e.target.closest('.asset-row');
+    if(!row || row.id==='row-'+dragSourceId) return;
+    const rect = row.getBoundingClientRect();
+    const before = (e.clientY - rect.top) < rect.height/2;
+    list.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom'));
+    row.classList.add(before ? 'drag-over-top' : 'drag-over-bottom');
+  });
+
+  list.addEventListener('drop', e=>{
+    if(!dragSourceId) return;
+    e.preventDefault();
+    const row = e.target.closest('.asset-row');
+    list.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom','dragging'));
+    if(row && row.id!=='row-'+dragSourceId){
+      const targetId = row.id.replace('row-','');
+      const fromIdx = assets.findIndex(x=>x.id===dragSourceId);
+      let toIdx = assets.findIndex(x=>x.id===targetId);
+      const rect = row.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height/2;
+      const [moved] = assets.splice(fromIdx,1);
+      toIdx = assets.findIndex(x=>x.id===targetId);
+      assets.splice(before ? toIdx : toIdx+1, 0, moved);
+      render(); saveState();
+    }
+    dragSourceId = null;
+  });
+
+  list.addEventListener('dragend', ()=>{
+    list.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom','dragging'));
+    dragSourceId = null;
+  });
+  document.getElementById('assetList').addEventListener('input', e=>{
+    const t = e.target;
+    const id = t.dataset.id;
+    if(!id) return;
+    const a = assets.find(x=>x.id===id);
+    const subid = t.dataset.subid;
+
+    if(t.dataset.action==='slider'){
+      const raw = parseFloat(t.value) || 0;
+      const snapped = snapPct(raw);
+      const capped = Math.min(snapped, remainingTopPct(id));
+      a.pct = capped;
+      if(Math.abs(capped - raw) > 0.001){
+        t.value = capped; // "gruda" no valor redondo (ou trava no que sobra até 100%)
+        pulseSnap('sliderrow-'+id);
+      }
+      t.style.background = sliderFillBg(a.pct);
+      const numEl = document.getElementById('pctnum-'+id);
+      if(numEl) numEl.value = a.pct.toFixed(1);
+      liveUpdate(); saveState();
+    } else if(t.dataset.action==='pctnum'){
+      let v = parseFloat(t.value);
+      if(isNaN(v)) v = 0;
+      v = Math.min(remainingTopPct(id), Math.max(0, v));
+      a.pct = v;
+      if(parseFloat(t.value) !== v) t.value = v.toFixed(1);
+      const sliderEl = document.getElementById('pctslider-'+id);
+      if(sliderEl){ sliderEl.value = v; sliderEl.style.background = sliderFillBg(v); }
+      liveUpdate(); saveState();
+    } else if(t.dataset.action==='rename'){
+      a.name = t.value;
+      saveState();
+    } else if(t.dataset.action==='subslider'){
+      const s = a.subgroups.find(x=>x.id===subid);
+      if(!s) return;
+      const raw = parseFloat(t.value) || 0;
+      const snapped = snapPct(raw);
+      const capped = Math.min(snapped, remainingSubPct(a, subid));
+      s.pct = capped;
+      if(Math.abs(capped - raw) > 0.001){
+        t.value = capped;
+        pulseSnap('subsliderrow-'+subid);
+      }
+      t.style.background = sliderFillBg(s.pct);
+      const numEl = document.getElementById('subpctnum-'+subid);
+      if(numEl) numEl.value = s.pct.toFixed(1);
+      const sumEl = document.getElementById('subsum-'+id);
+      if(sumEl){
+        const sum = subPctSum(a);
+        const ok = Math.abs(sum-100)<0.01;
+        sumEl.className = 'sub-sum ' + (ok?'ok':'bad');
+        sumEl.innerHTML = `<span>soma dos subgrupos</span><span>${sum.toFixed(1)}% ${ok?'— fechado':'— deveria fechar em 100%'}</span>`;
+      }
+      liveUpdate(); saveState();
+    } else if(t.dataset.action==='subpctnum'){
+      const s = a.subgroups.find(x=>x.id===subid);
+      if(!s) return;
+      let v = parseFloat(t.value);
+      if(isNaN(v)) v = 0;
+      v = Math.min(remainingSubPct(a, subid), Math.max(0, v));
+      s.pct = v;
+      if(parseFloat(t.value) !== v) t.value = v.toFixed(1);
+      const sliderEl = document.getElementById('subpctslider-'+subid);
+      if(sliderEl){ sliderEl.value = v; sliderEl.style.background = sliderFillBg(v); }
+      const sumEl = document.getElementById('subsum-'+id);
+      if(sumEl){
+        const sum = subPctSum(a);
+        const ok = Math.abs(sum-100)<0.01;
+        sumEl.className = 'sub-sum ' + (ok?'ok':'bad');
+        sumEl.innerHTML = `<span>soma dos subgrupos</span><span>${sum.toFixed(1)}% ${ok?'— fechado':'— deveria fechar em 100%'}</span>`;
+      }
+      liveUpdate(); saveState();
+    } else if(t.dataset.action==='subrename'){
+      const s = a.subgroups.find(x=>x.id===subid);
+      if(s){ s.name = t.value; saveState(); }
+    }
+  });
+  document.getElementById('assetList').addEventListener('change', e=>{
+    const t = e.target;
+    if(t.dataset.action==='current'){
+      const a = assets.find(x=>x.id===t.dataset.id);
+      if(hasActiveSubgroups(a)) return; // travado enquanto houver subgrupos ativos
+      a.current = parseNum(t.value);
+      render(); saveState();
+    } else if(t.dataset.action==='subcurrent'){
+      const a = assets.find(x=>x.id===t.dataset.id);
+      const s = a && a.subgroups.find(x=>x.id===t.dataset.subid);
+      if(s){ s.current = parseNum(t.value); render(); saveState(); }
+    }
+  });
+  document.getElementById('aporteInput').addEventListener('change', e=>{
+    aporte = parseNum(e.target.value);
+    render(); saveState();
+  });
+  document.getElementById('addAssetBtn').addEventListener('click', ()=>{
+    const n = assets.length+1;
+    assets.push({id:'custom'+Date.now(), name:'Novo grupo', pct:0, current:0, active:true, subgroups:[], color:null});
+    render(); saveState();
+  });
+  document.getElementById('calcBtn').addEventListener('click', calcular);
+}
+
+// mesma regra de balanceamento (fecha menor déficit primeiro, resto proporcional ao peso)
+// usada tanto entre os grupos quanto, dentro de cada grupo, entre os subgrupos
+function distributeByRule(items, amount){
+  const alloc = {};
+  items.forEach(it=>{ alloc[it.id]=0; });
+  const underweight = items.filter(x=>x.deficit>0.01).sort((x,y)=>x.deficit-y.deficit);
+  let remaining = amount;
+  for(let i=0;i<underweight.length && remaining>0.005;i++){
+    const it = underweight[i];
+    const take = Math.min(it.deficit, remaining);
+    alloc[it.id] += take;
+    remaining -= take;
+  }
+  if(remaining > 0.005 && items.length>0){
+    const totalW = items.reduce((s,it)=>s+Number(it.weight||0),0);
+    if(totalW > 0){
+      items.forEach(it=>{ alloc[it.id] += remaining * (Number(it.weight||0)/totalW); });
+    }
+    remaining = 0;
+  }
+  return alloc;
+}
+
+function calcular(){
+  const total = totalPatrimonio();
+  const list = activeAssets().map(a=>{
+    const targetVal = total*(a.pct/100);
+    const deficit = Math.max(0, targetVal - getGroupCurrent(a));
+    return {...a, targetVal, deficit};
+  });
+
+  const alloc = distributeByRule(list.map(a=>({id:a.id, weight:a.pct, deficit:a.deficit})), aporte);
+
+  // dentro de cada grupo que tem subgrupos ativos, reaplica a mesma regra
+  // usando o valor que aquele grupo recebeu como o "aporte" local dos subgrupos
+  const subAllocByParent = {};
+  list.forEach(a=>{
+    if(hasActiveSubgroups(a) && alloc[a.id] > 0.005){
+      const subItems = a.subgroups.filter(s=>s.active).map(s=>{
+        const subTargetVal = a.targetVal * (Number(s.pct||0)/100);
+        const subDeficit = Math.max(0, subTargetVal - Number(s.current||0));
+        return {id:s.id, weight:s.pct, deficit:subDeficit, name:s.name};
+      });
+      subAllocByParent[a.id] = { items: subItems, alloc: distributeByRule(subItems, alloc[a.id]) };
+    }
+  });
+
+  const resultBody = document.getElementById('resultBody');
+  resultBody.innerHTML='';
+  document.getElementById('resultTotal').textContent = fmt(aporte);
+
+  const toShow = list.filter(a=>alloc[a.id] > 0.005);
+
+  if(toShow.length===0 || aporte<=0){
+    resultBody.innerHTML = `<div class="empty-note">${aporte<=0 ? 'informe o valor do aporte deste mês.' : 'nenhum grupo ativo para receber aporte.'}</div>`;
+  } else {
+    toShow.slice().sort((x,y)=>alloc[y.id]-alloc[x.id]).forEach(a=>{
+      const idx = assets.findIndex(x=>x.id===a.id);
+      const c = colorFor(idx, a);
+      const val = alloc[a.id];
+      const pctOfAporte = (val/aporte*100);
+      const wasDeficit = a.deficit>0.01;
+      const row = document.createElement('div');
+      row.className='alloc-row';
+      row.innerHTML = `
+        <span class="name"><span class="swatch" style="background:${c}"></span>${a.name}${wasDeficit ? '' : ' <span class=\"alloc-tag\">proporcional</span>'}</span>
+        <span class="bar-track"><span class="bar-fill" style="width:${pctOfAporte}%;background:${c}"></span></span>
+        <span class="amt">${fmt(val)}</span>
+      `;
+      resultBody.appendChild(row);
+
+      const subInfo = subAllocByParent[a.id];
+      if(subInfo){
+        const subWrap = document.createElement('div');
+        subWrap.className = 'alloc-sub-wrap';
+        subInfo.items.slice().sort((x,y)=>subInfo.alloc[y.id]-subInfo.alloc[x.id]).forEach(s=>{
+          const sVal = subInfo.alloc[s.id];
+          if(sVal <= 0.005) return;
+          const sPctOfParent = (sVal/val*100);
+          const sWasDeficit = s.deficit>0.01;
+          const subRow = document.createElement('div');
+          subRow.className = 'alloc-sub-row';
+          subRow.innerHTML = `
+            <span class="name">${s.name}${sWasDeficit ? '' : ' <span class=\"alloc-tag\">proporcional</span>'}</span>
+            <span class="bar-track"><span class="bar-fill" style="width:${sPctOfParent}%;background:${c}"></span></span>
+            <span class="amt">${fmt(sVal)}</span>
+          `;
+          subWrap.appendChild(subRow);
+        });
+        resultBody.appendChild(subWrap);
+      }
+    });
+  }
+
+  const status = document.getElementById('resultStatus');
+  status.textContent = 'Prioriza quem está mais abaixo da meta; o resto é dividido proporcionalmente (mesma regra vale dentro dos subgrupos). Não considera venda de posições.';
+
+  // simulação: como fica a carteira (em %) depois de aplicar esse aporte nos grupos indicados
+  const simSection = document.getElementById('simSection');
+  const simTapeBar = document.getElementById('simTapeBar');
+  const simRows = document.getElementById('simRows');
+  simTapeBar.innerHTML = '';
+  simRows.innerHTML = '';
+
+  if(toShow.length===0 || aporte<=0){
+    simSection.style.display = 'none';
+  } else {
+    simSection.style.display = 'block';
+    const newTotal = total + aporte;
+    list.forEach(a=>{
+      const idx = assets.findIndex(x=>x.id===a.id);
+      const c = colorFor(idx, a);
+      const newValue = getGroupCurrent(a) + (alloc[a.id]||0);
+      const newPct = newTotal>0 ? (newValue/newTotal*100) : 0;
+      const oldPct = total>0 ? (getGroupCurrent(a)/total*100) : 0;
+
+      const seg = document.createElement('div');
+      seg.className = 'seg';
+      seg.style.width = newPct+'%';
+      seg.style.background = c;
+      simTapeBar.appendChild(seg);
+
+      const gap = Math.abs(newPct - a.pct);
+      const closeClass = gap<0.5 ? 'close' : (gap<2.5 ? 'mid' : 'far');
+
+      const row = document.createElement('div');
+      row.className = 'sim-row';
+      row.innerHTML = `
+        <span class="sim-name"><span class="swatch" style="background:${c}"></span>${a.name}</span>
+        <span class="sim-before">${oldPct.toFixed(1)}%</span>
+        <span class="sim-arrow">→</span>
+        <span class="sim-after ${closeClass}">${newPct.toFixed(1)}%</span>
+        <span class="sim-target">meta ${Number(a.pct).toFixed(1)}%</span>
+      `;
+      simRows.appendChild(row);
+    });
+  }
+
+  document.getElementById('result').classList.add('show');
+}
+
+/* ---------------- onboarding ---------------- */
+const ONBOARD_KEY = 'portfolio-rebalance-onboarding-v1';
+
+const OB_STEPS = [
+  {
+    title: 'Bem-vindo ao Rebalanceador de Carteira',
+    text: 'Essa ferramenta te ajuda a decidir onde colocar seu aporte mensal para deixar a carteira mais perto da alocação que você definiu como meta — sem precisar vender nada que já tem.',
+    visual: `<div class="ob-coin">R$</div>`
+  },
+  {
+    title: '1. Defina as metas por grupo',
+    text: 'Ative ou desative grupos de ativos e ajuste o % de cada um pelo slider (ele "gruda" nos múltiplos de 5) ou digitando o número direto. A soma dos grupos ativos precisa fechar em 100%.',
+    visual: `
+      <div class="ob-demo-row">
+        <div class="ob-toggle-line"><div class="ob-toggle"></div><span class="ob-toggle-label">ativo?</span></div>
+        <div class="ob-slider-track"><div class="ob-slider-thumb"></div></div>
+        <div class="ob-sum">soma das metas: 100% ✓</div>
+      </div>`
+  },
+  {
+    title: '2. Informe sua posição atual',
+    text: 'Preencha quanto você já tem em cada grupo. A ferramenta calcula sozinha quanto isso representa da sua carteira hoje e compara com a meta — com uma faixa neutra pra quando já está "perto o suficiente".',
+    visual: `
+      <div class="ob-bar-wrap">
+        <div class="ob-bar-label"><span>hoje</span><span>faltam R$ 4.700</span></div>
+        <div class="ob-bar-track"><div class="ob-bar-fill"></div></div>
+      </div>`
+  },
+  {
+    title: '3. Divida um grupo em subgrupos',
+    text: 'Dentro de um grupo (ex: Ações), crie subgrupos com pesos próprios (ex: 50% DIVO11, 20% BEST11, 30% SMAL11). A posição do grupo passa a ser a soma deles automaticamente.',
+    visual: `
+      <div class="ob-sub-demo">
+        <div class="ob-sub-parent"><span>Ações</span><span>20%</span></div>
+        <div class="ob-sub-children">
+          <div class="ob-sub-row"><span class="ob-sub-label">DIVO11</span><div class="ob-sub-bar"><span></span></div></div>
+          <div class="ob-sub-row"><span class="ob-sub-label">BEST11</span><div class="ob-sub-bar"><span></span></div></div>
+          <div class="ob-sub-row"><span class="ob-sub-label">SMAL11</span><div class="ob-sub-bar"><span></span></div></div>
+        </div>
+      </div>`
+  },
+  {
+    title: '4. Arraste para reordenar, apague se quiser',
+    text: 'Segure a alcinha ⠿ e arraste um grupo pra cima ou pra baixo. Pra apagar, clique no × — ele fica vermelho pedindo confirmação, aí é só clicar de novo.',
+    visual: `
+      <div class="ob-reorder-demo">
+        <div class="ob-reorder-row"><span class="handle">⠿</span> Ações</div>
+        <div class="ob-reorder-row"><span class="handle">⠿</span> Imobiliário</div>
+      </div>
+      <div class="ob-delete-demo"><div class="ob-delete-x">×</div> apagar</div>`
+  },
+  {
+    title: '5. Diga quanto vai investir no mês',
+    text: 'Digite o valor do aporte e clique em calcular. Ela fecha primeiro os grupos mais próximos da meta e mostra uma simulação de como fica sua carteira depois do aporte.',
+    visual: `
+      <div class="ob-flow">
+        <div class="ob-coin-sm"></div>
+        <div class="ob-target-bars">
+          <div class="row"><span></span></div>
+          <div class="row"><span></span></div>
+        </div>
+      </div>`
+  },
+  {
+    title: '6. Deixe do seu jeito',
+    text: 'Escolha qualquer cor de destaque (não só uma paleta fixa) e a cor de cada grupo individualmente, numa grade com várias opções — incluindo o roxo do Nubank. Modo claro ou escuro, à sua escolha. Tudo fica salvo neste navegador, e seus dados não saem do seu computador.',
+    visual: `
+      <div style="text-align:center;">
+        <div class="ob-color-grid">
+          ${Array.from({length:14}).map(()=>'<div class="ob-swatch"></div>').join('')}
+        </div>
+        <div class="ob-mode-icon">☾ / ☀</div>
+      </div>`
+  },
+];
+
+let obIndex = 0;
+
+function renderOnboardStep(){
+  const s = OB_STEPS[obIndex];
+  document.getElementById('onboardingVisual').innerHTML = s.visual;
+  document.getElementById('onboardingTitle').textContent = s.title;
+  document.getElementById('onboardingText').textContent = s.text;
+
+  const dots = document.getElementById('onboardingDots');
+  dots.innerHTML = '';
+  OB_STEPS.forEach((_,i)=>{
+    const d = document.createElement('div');
+    d.className = 'dot' + (i===obIndex ? ' active':'');
+    dots.appendChild(d);
+  });
+
+  document.getElementById('onboardingBack').style.visibility = obIndex===0 ? 'hidden' : 'visible';
+  document.getElementById('onboardingNext').textContent = obIndex===OB_STEPS.length-1 ? 'começar' : 'próximo';
+}
+
+function openOnboarding(){
+  obIndex = 0;
+  renderOnboardStep();
+  document.getElementById('onboardingOverlay').classList.add('show');
+}
+function closeOnboarding(){
+  const dontShow = document.getElementById('onboardingDontShow').checked;
+  if(dontShow){
+    try{ localStorage.setItem(ONBOARD_KEY, 'dismissed'); }catch(e){}
+  }
+  document.getElementById('onboardingOverlay').classList.remove('show');
+}
+
+function attachOnboardingHandlers(){
+  document.getElementById('onboardingNext').addEventListener('click', ()=>{
+    if(obIndex < OB_STEPS.length-1){ obIndex++; renderOnboardStep(); }
+    else { closeOnboarding(); }
+  });
+  document.getElementById('onboardingBack').addEventListener('click', ()=>{
+    if(obIndex>0){ obIndex--; renderOnboardStep(); }
+  });
+  document.getElementById('onboardingClose').addEventListener('click', closeOnboarding);
+  document.getElementById('onboardingOverlay').addEventListener('click', e=>{
+    if(e.target.id==='onboardingOverlay') closeOnboarding();
+  });
+  document.getElementById('helpBtn').addEventListener('click', openOnboarding);
+}
+
+function maybeShowOnboarding(){
+  let dismissed = null;
+  try{ dismissed = localStorage.getItem(ONBOARD_KEY); }catch(e){}
+  if(!dismissed){ openOnboarding(); }
+}
+/* ------------------------------------------------ */
+
+(function init(){
+  loadTheme();
+  applyTheme();
+  loadState();
+  render();
+  attachHandlers();
+  attachOnboardingHandlers();
+  maybeShowOnboarding();
+})();
+</script>
+</body>
+</html>
