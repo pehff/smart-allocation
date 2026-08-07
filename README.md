@@ -2,9 +2,11 @@
 
 > Optimize your monthly contributions to keep your portfolio aligned with your target asset allocation.
 
-**Smart Allocation** is a lightweight, client-side web application that helps investors decide **where to invest their next monthly contribution**.
+**Smart Allocation** is a lightweight web application that helps investors answer one simple question:
 
-Instead of telling you to sell assets to rebalance your portfolio, Smart Allocation calculates how new contributions should be distributed across your asset classes to gradually move your portfolio toward your desired allocation.
+> **"I have money to invest this month. Where should I put it?"**
+
+Instead of recommending asset sales to rebalance your portfolio, Smart Allocation calculates how new contributions should be distributed to gradually move your portfolio toward its target allocation.
 
 🌐 **Live Demo:** https://pehff.github.io/smart-allocation/
 
@@ -18,38 +20,38 @@ Instead of telling you to sell assets to rebalance your portfolio, Smart Allocat
 - 📈 Simulate your portfolio after the contribution
 - 🗂️ Organize assets into groups and subgroups
 - 🎨 Customize colors and appearance
-- 💾 Automatically save data in your browser
-- 🔒 100% client-side — no accounts, no backend, no data collection
+- 💾 Automatically save your portfolio locally
+- 🔒 100% client-side — no backend, no accounts, no data collection
 
 ---
 
-## Why?
+## Why Smart Allocation?
 
-Most portfolio tools answer the question:
+Most portfolio tools focus on telling you **how far your portfolio is from its target allocation**.
 
-> *"Is my portfolio balanced?"*
+Smart Allocation focuses on something more practical:
 
-Smart Allocation answers a different—and arguably more useful—question:
+> **How should I invest my next contribution?**
 
-> **"I have money to invest this month. Where should I put it?"**
+Rather than suggesting you sell assets and generate unnecessary transactions, Smart Allocation uses your monthly contributions to naturally bring your portfolio closer to your desired allocation.
 
-By prioritizing new contributions instead of asset sales, you can naturally move your portfolio closer to its target allocation while avoiding unnecessary transactions.
+This makes the process simple, efficient, and easy to follow over time.
 
 ---
 
 ## How it works
 
 1. Define your target asset allocation.
-2. Enter your current portfolio values.
+2. Enter the current value of each asset class.
 3. Specify your monthly contribution.
-4. Let Smart Allocation calculate the optimal distribution.
-5. Review how your portfolio looks after the investment.
+4. Smart Allocation calculates the optimal contribution for each asset.
+5. Review a simulation of your portfolio after the investment.
 
 ---
 
 ## Screenshots
 
-> *Coming soon.*
+*Coming soon.*
 
 ---
 
@@ -62,19 +64,23 @@ Smart Allocation is intentionally simple.
 - Vanilla JavaScript
 
 No frameworks.
+
 No dependencies.
+
 No backend.
 
 ---
 
 ## Privacy
 
-Your financial data never leaves your computer.
+Everything runs entirely in your browser.
 
-Smart Allocation runs entirely in your browser and stores your portfolio using your browser's local storage.
+Your portfolio data is stored locally using your browser's local storage.
 
-No servers.
-No accounts.
+Nothing is uploaded.
+
+Nothing is shared.
+
 No tracking.
 
 ---
@@ -90,7 +96,7 @@ cd smart-allocation
 
 Then simply open `index.html` in your browser.
 
-Alternatively, access the hosted version on GitHub Pages:
+Or access the hosted version:
 
 https://pehff.github.io/smart-allocation/
 
@@ -110,7 +116,7 @@ https://pehff.github.io/smart-allocation/
 
 ## Contributing
 
-Contributions, suggestions and feature requests are always welcome.
+Contributions, ideas and feature requests are always welcome.
 
 Feel free to open an issue or submit a pull request.
 
