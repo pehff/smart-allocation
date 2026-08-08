@@ -184,6 +184,7 @@
     grid-column:1/2;grid-row:1;
     cursor:grab;color:var(--muted);font-size:13px;letter-spacing:-1px;
     display:flex;align-items:center;justify-content:center;user-select:none;
+    touch-action:none;padding:8px;margin:-8px;
   }
   .drag-handle:hover{color:var(--accent);}
   .drag-handle:active{cursor:grabbing;}
@@ -279,25 +280,25 @@
 
   .value-row{
     grid-column:1/6;grid-row:3;
-    display:flex;flex-direction:column;gap:8px;
-    font-family:var(--font-sans);font-size:12.5px;color:var(--muted);
+    display:flex;flex-direction:column;gap:9px;
+    font-family:var(--font-sans);font-size:14px;color:var(--muted);
     padding-top:2px;
   }
   .value-row-main{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .value-row-main label{display:flex;align-items:center;gap:6px;}
   .value-row .curr-input{
     background:var(--surface-2);border:1px solid var(--line);border-radius:5px;
-    color:var(--ink);font-family:var(--font-sans);font-size:12.5px;
-    padding:4px 7px;width:120px;outline:none;
+    color:var(--ink);font-family:var(--font-sans);font-size:14px;
+    padding:5px 8px;width:128px;outline:none;
   }
   .value-row .curr-input:focus{border-color:var(--accent-dim);}
   .value-row .curr-input:disabled{opacity:.55;cursor:not-allowed;}
-  .locked-note{font-size:10.5px;color:var(--muted);opacity:.75;font-style:italic;}
-  .value-row-stats{display:flex;align-items:center;gap:14px;flex-wrap:wrap;row-gap:6px;}
+  .locked-note{font-size:11.5px;color:var(--muted);opacity:.75;font-style:italic;}
+  .value-row-stats{display:flex;align-items:center;gap:16px;flex-wrap:wrap;row-gap:8px;}
   .value-row-stats .stat{color:var(--muted);white-space:nowrap;}
   .value-row-stats .stat b{color:var(--ink);font-weight:600;}
   .status-chip{
-    font-size:10.5px;font-weight:600;padding:4px 10px;border-radius:999px;
+    font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:999px;
     border:none;white-space:nowrap;
   }
   .status-chip.zero{color:var(--green);background:var(--green-dim);}
@@ -368,20 +369,20 @@
   .sub-info-row{
     grid-column:1/5;grid-row:3;
     display:flex;flex-direction:column;gap:6px;
-    font-family:var(--font-sans);font-size:11px;color:var(--muted);
+    font-family:var(--font-sans);font-size:12px;color:var(--muted);
   }
   .sub-info-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
   .sub-info-main label{display:flex;align-items:center;gap:5px;}
   .sub-curr-input{
     background:var(--surface);border:1px solid var(--line);border-radius:5px;
-    color:var(--ink);font-family:var(--font-sans);font-size:11px;
-    padding:3px 6px;width:100px;outline:none;
+    color:var(--ink);font-family:var(--font-sans);font-size:12px;
+    padding:4px 7px;width:106px;outline:none;
   }
   .sub-curr-input:focus{border-color:var(--accent-dim);}
-  .sub-info-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap;row-gap:5px;}
+  .sub-info-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap;row-gap:6px;}
   .sub-info-stats .stat{color:var(--muted);white-space:nowrap;}
   .sub-info-stats .stat b{color:var(--ink);font-weight:600;}
-  .sub-info-stats .status-chip{font-size:9.5px;padding:2px 8px;}
+  .sub-info-stats .status-chip{font-size:10.5px;padding:3px 9px;}
 
   .add-row{
     display:flex;justify-content:flex-end;margin-bottom:28px;
@@ -468,9 +469,10 @@
   .sim-row .sim-before{color:var(--muted);}
   .sim-row .sim-arrow{color:var(--muted);}
   .sim-row .sim-after{font-weight:600;}
-  .sim-row .sim-after.close{color:var(--green);}
-  .sim-row .sim-after.mid{color:var(--accent);}
-  .sim-row .sim-after.far{color:var(--rust);}
+  .sim-row .sim-after.zero{color:var(--green);}
+  .sim-row .sim-after.ok{color:var(--neutral);}
+  .sim-row .sim-after.under{color:var(--under);}
+  .sim-row .sim-after.over{color:var(--rust);}
   .sim-row .sim-target{color:var(--muted);font-size:10.5px;}
   .save-note{
     text-align:center;font-family:var(--font-sans);font-size:11px;color:var(--muted);
@@ -757,6 +759,7 @@
   </div>
 
   <div class="theme-bar">
+    <button class="help-btn" id="hideValuesBtn" title="ocultar valores"></button>
     <button class="help-btn" id="helpBtn">como usar ?</button>
     <button class="theme-swatch" id="themeAccentSwatch" data-action="opencolor" data-target="theme" title="escolher cor de destaque"></button>
     <div class="mode-toggle" id="modeToggle">
@@ -829,6 +832,28 @@
 
 <script>
 const fmt = v => 'R$ ' + (v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+// oculta valores em telas/exibições somente-leitura (mantém campos editáveis visíveis
+// enquanto a pessoa está de fato preenchendo) — como o olho do app do Nubank
+let hideValues = false;
+const HIDE_VALUES_KEY = 'portfolio-rebalance-hide-values';
+const fmtMasked = v => hideValues ? 'R$ ●●●●' : fmt(v);
+function loadHideValues(){
+  try{ hideValues = localStorage.getItem(HIDE_VALUES_KEY) === '1'; }catch(e){ hideValues = false; }
+}
+function saveHideValues(){
+  try{ localStorage.setItem(HIDE_VALUES_KEY, hideValues ? '1' : '0'); }catch(e){}
+}
+const EYE_OPEN_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.55 18.55 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+function applyHideValuesUI(){
+  const btn = document.getElementById('hideValuesBtn');
+  if(btn){
+    btn.innerHTML = hideValues ? EYE_OFF_SVG : EYE_OPEN_SVG;
+    btn.title = hideValues ? 'mostrar valores' : 'ocultar valores';
+  }
+}
+
 const parseNum = s => {
   if(typeof s === 'number') return s;
   if(!s) return 0;
@@ -902,7 +927,7 @@ function diffStatus(currentPct, targetPct){
 function diffStatusLabel(cls, diffRs){
   if(cls==='zero') return 'na meta';
   if(cls==='ok') return 'dentro da margem';
-  return diffRs>0 ? 'faltam '+fmt(diffRs) : 'acima em '+fmt(-diffRs);
+  return diffRs>0 ? 'faltam '+fmtMasked(diffRs) : 'acima em '+fmtMasked(-diffRs);
 }
 
 // trilha preenchida até o valor atual — mais confiável e bonito do que tentar alinhar
@@ -945,12 +970,12 @@ function renderSubgroupBlock(a, parentTargetVal){
         <div class="sub-info-row">
           <div class="sub-info-main">
             <label>posição atual
-              <input class="curr-input sub-curr-input" data-action="subcurrent" data-id="${a.id}" data-subid="${s.id}" value="${fmt(s.current)}" ${s.active?'':'disabled'}>
+              <input class="curr-input sub-curr-input" data-action="subcurrent" data-id="${a.id}" data-subid="${s.id}" value="${fmtMasked(s.current)}" ${s.active?'':'disabled'}>
             </label>
           </div>
           <div class="sub-info-stats">
             <span class="stat">hoje <b>${ofGroupPct.toFixed(1)}%</b> do grupo</span>
-            <span class="stat" id="subtargetval-${s.id}">meta <b>${fmt(subTargetVal)}</b></span>
+            <span class="stat" id="subtargetval-${s.id}">meta <b>${fmtMasked(subTargetVal)}</b></span>
             <span class="status-chip ${diffClass}" id="subdiffval-${s.id}">${diffLabel}</span>
           </div>
         </div>
@@ -1242,7 +1267,7 @@ function render(){
   document.getElementById('aporteInput').value = aporte ? fmt(aporte) : '';
 
   const total = totalPatrimonio();
-  document.getElementById('totalPatrimonio').textContent = fmt(total);
+  document.getElementById('totalPatrimonio').textContent = fmtMasked(total);
 
   // deviation sum
   let offTarget = 0;
@@ -1250,7 +1275,7 @@ function render(){
     const targetVal = total * (a.pct/100);
     offTarget += Math.abs(targetVal - getGroupCurrent(a));
   });
-  document.getElementById('pctOffTarget').textContent = fmt(offTarget);
+  document.getElementById('pctOffTarget').textContent = fmtMasked(offTarget);
 
   // pct total indicator
   const sum = pctSum();
@@ -1317,14 +1342,14 @@ function render(){
         <div class="value-row-main">
           <label>posição atual
             <input class="curr-input" data-action="current" data-id="${a.id}"
-                   value="${fmt(locked ? groupCurrentVal : a.current)}" ${(a.active && !locked)?'':'disabled'}
+                   value="${fmtMasked(locked ? groupCurrentVal : a.current)}" ${(a.active && !locked)?'':'disabled'}
                    title="${locked ? 'travado: soma dos subgrupos ativos' : ''}">
           </label>
           ${locked ? '<span class="locked-note">= soma dos subgrupos</span>' : ''}
         </div>
         <div class="value-row-stats">
           <span class="stat" id="currpct-${a.id}">hoje <b>${currPct.toFixed(1)}%</b> da carteira</span>
-          <span class="stat" id="targetval-${a.id}">meta <b>${fmt(targetVal)}</b></span>
+          <span class="stat" id="targetval-${a.id}">meta <b>${fmtMasked(targetVal)}</b></span>
           <span class="status-chip ${diffClass}" id="diffval-${a.id}">${diffLabel}</span>
         </div>
       </div>
@@ -1344,7 +1369,7 @@ function render(){
 // então o arrasto do slider fica fluido e não perde o foco/posição do ponteiro
 function liveUpdate(){
   const total = totalPatrimonio();
-  document.getElementById('totalPatrimonio').textContent = fmt(total);
+  document.getElementById('totalPatrimonio').textContent = fmtMasked(total);
 
   let offTarget = 0;
   const sum = pctSum();
@@ -1355,7 +1380,7 @@ function liveUpdate(){
     const targetEl = document.getElementById('targetval-'+a.id);
     const diffEl = document.getElementById('diffval-'+a.id);
     const currPctEl = document.getElementById('currpct-'+a.id);
-    if(targetEl) targetEl.innerHTML = 'meta <b>' + fmt(targetVal) + '</b>';
+    if(targetEl) targetEl.innerHTML = 'meta <b>' + fmtMasked(targetVal) + '</b>';
     const currPct = total>0 ? (getGroupCurrent(a)/total*100) : 0;
     if(currPctEl){
       currPctEl.innerHTML = 'hoje <b>' + currPct.toFixed(1) + '%</b> da carteira';
@@ -1377,7 +1402,7 @@ function liveUpdate(){
       const subTargetVal = targetVal * (Number(s.pct||0)/100);
       const subTargetEl = document.getElementById('subtargetval-'+s.id);
       const subDiffEl = document.getElementById('subdiffval-'+s.id);
-      if(subTargetEl) subTargetEl.innerHTML = 'meta <b>' + fmt(subTargetVal) + '</b>';
+      if(subTargetEl) subTargetEl.innerHTML = 'meta <b>' + fmtMasked(subTargetVal) + '</b>';
       if(subDiffEl){
         const d = subTargetVal - Number(s.current||0);
         const ofGroupPct = groupCur>0 ? (Number(s.current||0)/groupCur*100) : 0;
@@ -1387,7 +1412,7 @@ function liveUpdate(){
       }
     });
   });
-  document.getElementById('pctOffTarget').textContent = fmt(offTarget);
+  document.getElementById('pctOffTarget').textContent = fmtMasked(offTarget);
 
   const pctEl = document.getElementById('pctTotal');
   pctEl.className = 'pct-total ' + (Math.abs(sum-100)<0.01 ? 'ok' : 'bad');
@@ -1396,6 +1421,32 @@ function liveUpdate(){
 }
 
 function attachHandlers(){
+  /* ---- revela o valor real ao focar um campo de posição atual (mesmo com valores ocultos) ---- */
+  document.getElementById('assetList').addEventListener('focusin', e=>{
+    if(!hideValues) return;
+    const t = e.target;
+    if(t.dataset.action==='current'){
+      const a = assets.find(x=>x.id===t.dataset.id);
+      if(a && !hasActiveSubgroups(a)) t.value = fmt(a.current);
+    } else if(t.dataset.action==='subcurrent'){
+      const a = assets.find(x=>x.id===t.dataset.id);
+      const s = a && a.subgroups.find(x=>x.id===t.dataset.subid);
+      if(s) t.value = fmt(s.current);
+    }
+  });
+  document.getElementById('assetList').addEventListener('focusout', e=>{
+    if(!hideValues) return;
+    const t = e.target;
+    if(t.dataset.action==='current'){
+      const a = assets.find(x=>x.id===t.dataset.id);
+      if(a) t.value = fmtMasked(hasActiveSubgroups(a) ? getGroupCurrent(a) : a.current);
+    } else if(t.dataset.action==='subcurrent'){
+      const a = assets.find(x=>x.id===t.dataset.id);
+      const s = a && a.subgroups.find(x=>x.id===t.dataset.subid);
+      if(s) t.value = fmtMasked(s.current);
+    }
+  });
+
   /* ---- tooltip ao passar o mouse nos segmentos da barra meta/posição atual ---- */
   const tapeTooltip = document.getElementById('tapeTooltip');
   function showTapeTooltip(seg, evt){
@@ -1492,6 +1543,19 @@ function attachHandlers(){
   const list = document.getElementById('assetList');
   let dragSourceId = null;
 
+  function performReorder(sourceId, targetRow, clientY){
+    if(!targetRow || targetRow.id === 'row-'+sourceId) return;
+    const targetId = targetRow.id.replace('row-','');
+    const rect = targetRow.getBoundingClientRect();
+    const before = (clientY - rect.top) < rect.height/2;
+    const fromIdx = assets.findIndex(x=>x.id===sourceId);
+    if(fromIdx<0) return;
+    const [moved] = assets.splice(fromIdx,1);
+    const toIdx = assets.findIndex(x=>x.id===targetId);
+    assets.splice(before ? toIdx : toIdx+1, 0, moved);
+    render(); saveState();
+  }
+
   list.addEventListener('dragstart', e=>{
     const handle = e.target.closest('.drag-handle');
     if(!handle) return;
@@ -1521,17 +1585,7 @@ function attachHandlers(){
     e.preventDefault();
     const row = e.target.closest('.asset-row');
     list.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom','dragging'));
-    if(row && row.id!=='row-'+dragSourceId){
-      const targetId = row.id.replace('row-','');
-      const fromIdx = assets.findIndex(x=>x.id===dragSourceId);
-      let toIdx = assets.findIndex(x=>x.id===targetId);
-      const rect = row.getBoundingClientRect();
-      const before = (e.clientY - rect.top) < rect.height/2;
-      const [moved] = assets.splice(fromIdx,1);
-      toIdx = assets.findIndex(x=>x.id===targetId);
-      assets.splice(before ? toIdx : toIdx+1, 0, moved);
-      render(); saveState();
-    }
+    performReorder(dragSourceId, row, e.clientY);
     dragSourceId = null;
   });
 
@@ -1539,6 +1593,82 @@ function attachHandlers(){
     list.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom','dragging'));
     dragSourceId = null;
   });
+
+  /* ---- arrastar no toque: segura a alça ~550ms e move o dedo ---- */
+  let touchDragId = null, touchDragTimer = null, touchDragArmed = false;
+  let touchStartX = 0, touchStartY = 0, touchRowEl = null;
+
+  list.addEventListener('pointerdown', e=>{
+    if(e.pointerType === 'mouse') return; // mouse já usa o drag-and-drop nativo acima
+    const handle = e.target.closest('.drag-handle');
+    if(!handle) return;
+    const id = handle.dataset.id;
+    const row = document.getElementById('row-'+id);
+    if(!row) return;
+    touchStartX = e.clientX; touchStartY = e.clientY;
+    touchDragArmed = false;
+    clearTimeout(touchDragTimer);
+    touchDragTimer = setTimeout(()=>{
+      touchDragArmed = true;
+      touchDragId = id;
+      touchRowEl = row;
+      row.classList.add('dragging');
+      row.style.position = 'relative';
+      row.style.zIndex = '50';
+      try{ handle.setPointerCapture(e.pointerId); }catch(err){}
+      try{ if(navigator.vibrate) navigator.vibrate(15); }catch(err){}
+    }, 550);
+  }, {passive:true});
+
+  list.addEventListener('pointermove', e=>{
+    if(!touchDragArmed){
+      // moveu antes de completar a espera? cancela e deixa rolar a página normalmente
+      if(touchDragTimer && (Math.abs(e.clientX-touchStartX)>10 || Math.abs(e.clientY-touchStartY)>10)){
+        clearTimeout(touchDragTimer); touchDragTimer = null;
+      }
+      return;
+    }
+    e.preventDefault();
+    const dy = e.clientY - touchStartY;
+    touchRowEl.style.transform = `translateY(${dy}px)`;
+    touchRowEl.style.pointerEvents = 'none';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    touchRowEl.style.pointerEvents = '';
+    const overRow = under && under.closest('.asset-row');
+    list.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom'));
+    if(overRow && overRow!==touchRowEl){
+      const rect = overRow.getBoundingClientRect();
+      const before = (e.clientY - rect.top) < rect.height/2;
+      overRow.classList.add(before ? 'drag-over-top' : 'drag-over-bottom');
+    }
+  }, {passive:false});
+
+  function endTouchDrag(e){
+    clearTimeout(touchDragTimer); touchDragTimer = null;
+    if(!touchDragArmed){ touchDragArmed = false; return; }
+    touchDragArmed = false;
+    const row = touchRowEl;
+    row.style.transform = ''; row.style.position = ''; row.style.zIndex = '';
+    row.classList.remove('dragging');
+    list.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom'));
+    row.style.pointerEvents = 'none';
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    row.style.pointerEvents = '';
+    const overRow = under && under.closest('.asset-row');
+    performReorder(touchDragId, overRow, e.clientY);
+    touchDragId = null; touchRowEl = null;
+  }
+  list.addEventListener('pointerup', endTouchDrag);
+  list.addEventListener('pointercancel', e=>{
+    clearTimeout(touchDragTimer); touchDragTimer = null;
+    if(touchRowEl){
+      touchRowEl.style.transform=''; touchRowEl.style.position=''; touchRowEl.style.zIndex='';
+      touchRowEl.classList.remove('dragging');
+    }
+    touchDragArmed = false; touchDragId = null; touchRowEl = null;
+    list.querySelectorAll('.asset-row').forEach(r=>r.classList.remove('drag-over-top','drag-over-bottom'));
+  });
+
   document.getElementById('assetList').addEventListener('input', e=>{
     const t = e.target;
     const id = t.dataset.id;
@@ -1690,7 +1820,7 @@ function calcular(){
 
   const resultBody = document.getElementById('resultBody');
   resultBody.innerHTML='';
-  document.getElementById('resultTotal').textContent = fmt(aporte);
+  document.getElementById('resultTotal').textContent = fmtMasked(aporte);
 
   const toShow = list.filter(a=>alloc[a.id] > 0.005);
 
@@ -1708,7 +1838,7 @@ function calcular(){
       row.innerHTML = `
         <span class="name"><span class="swatch" style="background:${c}"></span>${a.name}${wasDeficit ? '' : ' <span class=\"alloc-tag\">proporcional</span>'}</span>
         <span class="bar-track"><span class="bar-fill" style="width:${pctOfAporte}%;background:${c}"></span></span>
-        <span class="amt">${fmt(val)}</span>
+        <span class="amt">${fmtMasked(val)}</span>
       `;
       resultBody.appendChild(row);
 
@@ -1726,7 +1856,7 @@ function calcular(){
           subRow.innerHTML = `
             <span class="name">${s.name}${sWasDeficit ? '' : ' <span class=\"alloc-tag\">proporcional</span>'}</span>
             <span class="bar-track"><span class="bar-fill" style="width:${sPctOfParent}%;background:${c}"></span></span>
-            <span class="amt">${fmt(sVal)}</span>
+            <span class="amt">${fmtMasked(sVal)}</span>
           `;
           subWrap.appendChild(subRow);
         });
@@ -1763,8 +1893,7 @@ function calcular(){
       seg.style.background = c;
       simTapeBar.appendChild(seg);
 
-      const gap = Math.abs(newPct - a.pct);
-      const closeClass = gap<0.5 ? 'close' : (gap<2.5 ? 'mid' : 'far');
+      const gapClass = diffStatus(newPct, a.pct);
 
       const row = document.createElement('div');
       row.className = 'sim-row';
@@ -1772,7 +1901,7 @@ function calcular(){
         <span class="sim-name"><span class="swatch" style="background:${c}"></span>${a.name}</span>
         <span class="sim-before">${oldPct.toFixed(1)}%</span>
         <span class="sim-arrow">→</span>
-        <span class="sim-after ${closeClass}">${newPct.toFixed(1)}%</span>
+        <span class="sim-after ${gapClass}">${newPct.toFixed(1)}%</span>
         <span class="sim-target">meta ${Number(a.pct).toFixed(1)}%</span>
       `;
       simRows.appendChild(row);
@@ -1916,11 +2045,19 @@ function maybeShowOnboarding(){
 (function init(){
   loadTheme();
   applyTheme();
+  loadHideValues();
+  applyHideValuesUI();
   loadState();
   render();
   attachHandlers();
   attachOnboardingHandlers();
   maybeShowOnboarding();
+  document.getElementById('hideValuesBtn').addEventListener('click', ()=>{
+    hideValues = !hideValues;
+    applyHideValuesUI();
+    saveHideValues();
+    render();
+  });
 })();
 </script>
 </body>
