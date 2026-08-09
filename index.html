@@ -879,8 +879,7 @@
     <p class="disclaimer">
       Esta ferramenta é uma calculadora de apoio a aportes mensais, com base nas metas e valores informados por você. Ela não constitui recomendação de investimento, consultoria financeira ou qualquer forma de aconselhamento — as decisões de alocação e investimento são de sua exclusiva responsabilidade.
     </p>
-    <p class="save-note" id="saveNote">Alterações salvas neste navegador.</p>
-    <p class="save-note">Todos os dados preenchidos ficam salvos apenas neste navegador — nada é enviado a nenhum servidor.</p>
+    <p class="save-note">Todos os dados preenchidos ficam salvos apenas neste navegador.</p>
   </div>
 
 </div>
@@ -1274,7 +1273,7 @@ document.getElementById('modeDarkBtn').addEventListener('click', ()=>{ currentMo
 document.getElementById('modeLightBtn').addEventListener('click', ()=>{ currentMode='light'; applyTheme(); saveTheme(); });
 /* ------------------------------------------------ */
 
-let lastUpdated = null;
+let lastPositionUpdate = null;
 
 function loadState(){
   try{
@@ -1287,38 +1286,38 @@ function loadState(){
         if(!a.color) a.color = ROW_COLORS[i % ROW_COLORS.length]; // fixa a cor no bloco, não na posição
       });
       aporte = parsed.aporte || 0;
-      lastUpdated = parsed.lastUpdated || null;
+      lastPositionUpdate = parsed.lastPositionUpdate || parsed.lastUpdated || null;
       return;
     }
   }catch(e){ /* localStorage indisponível (ex: aberto direto do file:// em alguns navegadores) */ }
   assets = DEFAULT_ASSETS.map(a=>({...a}));
   aporte = 0;
-  lastUpdated = null;
+  lastPositionUpdate = null;
 }
 
 function renderLastUpdated(){
   const el = document.getElementById('lastUpdatedDate');
   if(!el) return;
-  if(!lastUpdated){ el.textContent = 'ainda não editado'; return; }
-  const d = new Date(lastUpdated);
+  if(!lastPositionUpdate){ el.textContent = 'ainda não editado'; return; }
+  const d = new Date(lastPositionUpdate);
   el.textContent = d.toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'}) +
     ' às ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
 }
 
+// registra a data só quando o campo "posição atual" (grupo ou subgrupo) é editado —
+// não em qualquer alteração (renomear, mudar meta, tema, reordenar etc.)
+function markPositionUpdated(){
+  lastPositionUpdate = new Date().toISOString();
+  renderLastUpdated();
+}
+
 let saveTimer = null;
 function saveState(){
-  const note = document.getElementById('saveNote');
-  note.textContent = 'Salvando...';
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=>{
     try{
-      lastUpdated = new Date().toISOString();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({assets, aporte, lastUpdated}));
-      note.textContent = 'Alterações salvas neste navegador.';
-      renderLastUpdated();
-    }catch(e){
-      note.textContent = 'Não foi possível salvar automaticamente — o navegador está bloqueando o armazenamento local.';
-    }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({assets, aporte, lastPositionUpdate}));
+    }catch(e){ /* armazenamento local indisponível */ }
   }, 400);
 }
 
@@ -1822,11 +1821,12 @@ function attachHandlers(){
       const a = assets.find(x=>x.id===t.dataset.id);
       if(hasActiveSubgroups(a)) return; // travado enquanto houver subgrupos ativos
       a.current = parseNum(t.value);
+      markPositionUpdated();
       render(); saveState();
     } else if(t.dataset.action==='subcurrent'){
       const a = assets.find(x=>x.id===t.dataset.id);
       const s = a && a.subgroups.find(x=>x.id===t.dataset.subid);
-      if(s){ s.current = parseNum(t.value); render(); saveState(); }
+      if(s){ s.current = parseNum(t.value); markPositionUpdated(); render(); saveState(); }
     }
   });
   document.getElementById('aporteInput').addEventListener('change', e=>{
