@@ -244,11 +244,11 @@
   .toggle.on::after{left:16px;background:var(--on-accent);}
 
   .asset-name-row{
-    grid-column:3/4;grid-row:1;display:flex;align-items:center;gap:8px;font-family:var(--font-sans);font-size:17px;
+    grid-column:3/4;grid-row:1;display:flex;align-items:center;gap:9px;font-family:var(--font-sans);font-size:17px;
     min-width:0;align-self:center;
   }
   .asset-name-row .swatch{
-    width:10px;height:10px;border-radius:2px;flex:none;
+    width:13px;height:13px;border-radius:3px;flex:none;
     border:none;padding:0;cursor:pointer;box-shadow:0 0 0 0 transparent;
     transition:box-shadow .15s ease, transform .15s ease;
     align-self:center;
@@ -256,7 +256,7 @@
   .asset-name-row .swatch:hover{box-shadow:0 0 0 3px var(--surface-2), 0 0 0 4px var(--line);transform:scale(1.15);}
   .asset-name-row input.rename{
     background:transparent;border:none;outline:none;color:var(--ink);
-    font-family:var(--font-sans);font-size:17px;width:100%;min-width:0;border-bottom:1px dashed transparent;
+    font-family:var(--font-sans);font-size:17px;line-height:1.2;width:100%;min-width:0;border-bottom:1px dashed transparent;
     overflow:hidden;text-overflow:ellipsis;
   }
   .asset-name-row input.rename:focus{border-bottom-color:var(--accent-dim);}
@@ -370,7 +370,7 @@
   }
   .sub-rename:focus{border-bottom-color:var(--accent-dim);}
   .sub-rename:disabled{opacity:.5;}
-  .sub-pct-display{grid-column:3/4;grid-row:1;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:2px;}
+  .sub-pct-display{grid-column:3/4;grid-row:1;align-self:center;text-align:right;display:flex;align-items:center;justify-content:flex-end;gap:2px;color:var(--accent);}
   .sub-pct-num{
     width:64px;background:var(--surface);border:1px solid var(--line);border-radius:5px;
     color:var(--accent);font-family:var(--font-sans);font-size:13px;font-weight:600;
@@ -551,9 +551,9 @@
     border-radius:22px;overflow:hidden;position:relative;
     transform:translateY(10px) scale(.98);opacity:0;transition:transform .3s ease, opacity .3s ease;
     box-shadow:0 30px 60px rgba(0,0,0,0.4);
-    touch-action:pan-y;
   }
   .onboarding-overlay.show .onboarding-card{transform:translateY(0) scale(1);opacity:1;}
+  .onboarding-content{touch-action:pan-y;}
   .onboarding-close{
     position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--muted);
     font-size:20px;line-height:1;cursor:pointer;z-index:2;padding:4px 8px;
@@ -585,6 +585,7 @@
   .onboarding-nav{display:flex;gap:8px;}
   .onboarding-nav button{
     font-family:var(--font-sans);font-size:11.5px;padding:8px 16px;border-radius:6px;cursor:pointer;
+    min-width:88px;text-align:center;
   }
   .onboarding-nav .btn-back{background:transparent;border:1px solid var(--line);color:var(--muted);}
   .onboarding-nav .btn-back:hover{border-color:var(--accent-dim);color:var(--accent);}
@@ -748,10 +749,11 @@
 
     .asset-row{
       grid-template-columns:24px 38px 1fr 66px 20px;
-      gap:8px 7px;
+      gap:8px 10px;
       padding:14px 14px;
     }
-    .asset-name-row{ font-size:14.5px; gap:6px; }
+    .asset-name-row{ font-size:14.5px; gap:8px; }
+    .asset-name-row input.rename{ line-height:1.2; }
     .pct-display{ font-size:13px; }
     .toggle{ width:38px; height:23px; }
     .toggle::after{ width:17px; height:17px; }
@@ -802,10 +804,12 @@
   <div class="onboarding-overlay" id="onboardingOverlay">
     <div class="onboarding-card" id="onboardingCard">
       <button class="onboarding-close" id="onboardingClose">×</button>
-      <div class="onboarding-visual" id="onboardingVisual"></div>
-      <div class="onboarding-body">
-        <h2 id="onboardingTitle"></h2>
-        <p id="onboardingText"></p>
+      <div class="onboarding-content" id="onboardingContent">
+        <div class="onboarding-visual" id="onboardingVisual"></div>
+        <div class="onboarding-body">
+          <h2 id="onboardingTitle"></h2>
+          <p id="onboardingText"></p>
+        </div>
       </div>
       <div class="onboarding-dots" id="onboardingDots"></div>
       <div class="onboarding-footer">
@@ -2122,32 +2126,31 @@ function attachOnboardingHandlers(){
   });
   document.getElementById('helpBtn').addEventListener('click', openOnboarding);
 
-  /* ---- arrastar o dedo pros lados também troca de passo (touch/mouse) ---- */
-  const card = document.getElementById('onboardingCard');
+  /* ---- arrastar o dedo pros lados também troca de passo (só o conteúdo interno mexe) ---- */
+  const content = document.getElementById('onboardingContent');
   let obDragStartX = null, obDragging = false, obDragDeltaX = 0;
 
-  card.addEventListener('pointerdown', e=>{
-    if(e.target.closest('button, input, a')) return; // não atrapalha cliques nos controles
+  content.addEventListener('pointerdown', e=>{
     obDragStartX = e.clientX;
     obDragging = true;
     obDragDeltaX = 0;
-    card.style.transition = 'none';
-    try{ card.setPointerCapture(e.pointerId); }catch(err){}
+    content.style.transition = 'none';
+    try{ content.setPointerCapture(e.pointerId); }catch(err){}
   });
-  card.addEventListener('pointermove', e=>{
+  content.addEventListener('pointermove', e=>{
     if(!obDragging) return;
     obDragDeltaX = e.clientX - obDragStartX;
     // resistência visual nas pontas (primeiro/último passo)
     const atStart = obIndex===0 && obDragDeltaX>0;
     const atEnd = obIndex===OB_STEPS.length-1 && obDragDeltaX<0;
     const factor = (atStart || atEnd) ? 0.35 : 1;
-    card.style.transform = `translateX(${obDragDeltaX*factor}px)`;
+    content.style.transform = `translateX(${obDragDeltaX*factor}px)`;
   });
   function endObDrag(){
     if(!obDragging) return;
     obDragging = false;
-    card.style.transition = '';
-    card.style.transform = '';
+    content.style.transition = '';
+    content.style.transform = '';
     const THRESHOLD = 55;
     if(obDragDeltaX <= -THRESHOLD && obIndex < OB_STEPS.length-1){
       obIndex++; renderOnboardStep();
@@ -2156,8 +2159,8 @@ function attachOnboardingHandlers(){
     }
     obDragDeltaX = 0;
   }
-  card.addEventListener('pointerup', endObDrag);
-  card.addEventListener('pointercancel', endObDrag);
+  content.addEventListener('pointerup', endObDrag);
+  content.addEventListener('pointercancel', endObDrag);
 }
 
 function maybeShowOnboarding(){
