@@ -501,10 +501,9 @@
   .sim-row .sim-before{color:var(--muted);}
   .sim-row .sim-arrow{color:var(--muted);}
   .sim-row .sim-after{font-weight:600;}
-  .sim-row .sim-after.zero{color:var(--green);}
-  .sim-row .sim-after.ok{color:var(--neutral);}
-  .sim-row .sim-after.under{color:var(--under);}
-  .sim-row .sim-after.over{color:var(--rust);}
+  .sim-row .sim-after.up{color:var(--green);}
+  .sim-row .sim-after.down{color:var(--rust);}
+  .sim-row .sim-after.zero{color:var(--muted);}
   .sim-row .sim-target{color:var(--muted);font-size:10.5px;}
   .app-footer{ margin-top:32px; }
   .disclaimer{
@@ -570,9 +569,10 @@
     height:170px;background:var(--surface-2);border-bottom:1px solid var(--line);
     display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;
   }
-  .onboarding-body{padding:22px 24px 6px;}
+  .onboarding-body{padding:22px 24px 6px;min-height:172px;box-sizing:border-box;}
   .onboarding-body h2{
     font-family:var(--font-sans);font-size:19px;margin:0 0 8px;color:var(--ink);font-weight:500;
+    min-height:24px;
   }
   .onboarding-body p{
     font-family:var(--font-sans);font-size:13.5px;line-height:1.55;color:var(--muted);margin:0;
@@ -760,7 +760,7 @@
       gap:8px 8px;
       padding:14px 14px;
     }
-    .asset-name-row{ font-size:14.5px; gap:12px; }
+    .asset-name-row{ font-size:14.5px; gap:6px; margin-left:6px; }
     .asset-name-row input.rename{ line-height:1; }
     .pct-display{ font-size:13px; }
     .toggle{ width:38px; height:23px; }
@@ -1990,7 +1990,8 @@ function calcular(){
       seg.style.background = c;
       simTapeBar.appendChild(seg);
 
-      const gapClass = diffStatus(newPct, a.pct);
+      const diff = newPct - oldPct;
+      const changeClass = Math.abs(diff) < 0.05 ? 'zero' : (diff > 0 ? 'up' : 'down');
 
       const row = document.createElement('div');
       row.className = 'sim-row';
@@ -1998,7 +1999,7 @@ function calcular(){
         <span class="sim-name"><span class="swatch" style="background:${c}"></span>${a.name}</span>
         <span class="sim-before">${oldPct.toFixed(1)}%</span>
         <span class="sim-arrow">→</span>
-        <span class="sim-after ${gapClass}">${newPct.toFixed(1)}%</span>
+        <span class="sim-after ${changeClass}">${newPct.toFixed(1)}%</span>
         <span class="sim-target">meta ${Number(a.pct).toFixed(1)}%</span>
       `;
       simRows.appendChild(row);
